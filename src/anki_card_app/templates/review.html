@@ -15,6 +15,7 @@
         <div class="rating-grid" aria-label="Recall rating">
           {% for value, label, meaning in [(1, "Again", "Could not recall"), (2, "Hard", "Serious difficulty"), (3, "Good", "Some hesitation"), (4, "Easy", "Immediate recall")] %}
             <form action="/review/{{ entry.session.id }}/{{ entry.card.id }}/rate" method="post">
+              <input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}">
               <input type="hidden" name="attempt_id" value="{{ attempt_id }}">
               <input type="hidden" name="rating" value="{{ value }}">
               <button class="rating rating-{{ value }}" type="submit" data-shortcut="{{ value }}"><b>{{ label }} <kbd>{{ value }}</kbd></b><small>{{ meaning }}</small></button>
@@ -22,7 +23,7 @@
           {% endfor %}
         </div>
       {% else %}
-        <form action="/review/{{ entry.session.id }}/{{ entry.card.id }}/reveal" method="post"><button class="button primary" type="submit" data-shortcut="Space">Show answer <kbd>Space</kbd></button></form>
+        <form action="/review/{{ entry.session.id }}/{{ entry.card.id }}/reveal" method="post"><input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}"><button class="button primary" type="submit" data-shortcut="Space">Show answer <kbd>Space</kbd></button></form>
       {% endif %}
     </article>
   {% else %}

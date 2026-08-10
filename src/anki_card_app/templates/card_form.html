@@ -14,6 +14,7 @@
   </section>
   {% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
   <form method="post" class="card-form">
+    <input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}">
     {% if not editing %}
       <fieldset>
         <legend>Card type</legend>

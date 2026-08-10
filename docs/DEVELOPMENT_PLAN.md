@@ -68,11 +68,11 @@ FastAPI `BackgroundTasks` is acceptable for early local development and small pr
 | Milestone | Status | Remaining work |
 |---|---|---|
 | 0. Foundation | Complete locally | Production CI and deployment validation |
-| 1. Manual vertical slice | Complete locally | Multi-user authorization acceptance tests |
+| 1. Manual vertical slice | Complete locally | Authorization matrix must remain current as routes are added |
 | 2. Import and generation | Complete locally | Durable queue and formal AI evaluation corpus |
 | 3. FSRS daily review | Complete locally | Production PostgreSQL concurrency exercise |
 | 4. Dashboard and PWA | Core implementation complete | Product-event instrumentation, mobile browser flow, accessibility pass |
-| 5. Private alpha | Not started | Authentication, security, operations, privacy, and deployment |
+| 5. Private alpha | In progress | Invite acceptance, rate limits, operations, privacy, and deployment |
 
 The canonical continuation context is [Session Handoff Specification](SESSION_HANDOFF.md).
 
@@ -370,12 +370,14 @@ A feature is done when:
 
 ## 10. Immediate next action
 
-Start Milestone 5 with an authentication decision record and threat model. Then build the smallest multi-user authorization slice:
+The authentication, authorization, Session-bound CSRF, restrictive CSP, and
+escaped text-rendering slices are complete. Continue Milestone 5 with the next
+private-alpha operations slice:
 
-- replace the fixed development identity with request-scoped authenticated identity;
-- create two test users with isolated data;
-- prove that neither user can read or mutate the other's notes, cards, generation runs, review sessions, or metrics;
-- preserve the current local development workflow behind an explicit development-only configuration;
-- document logout, session expiry, invite acceptance, and account deletion behavior before expanding the UI.
+- implement single-use invite acceptance instead of administrator-shared passwords;
+- add login rate limits and security event logging without private content;
+- resolve card deletion semantics so review history cannot be silently cascaded away.
+- document and exercise database backup restoration;
+- prepare Railway deployment configuration and production acceptance checks.
 
 Do not add notifications, weekly quizzes, or automatic Obsidian synchronization before the ownership boundary is verified.

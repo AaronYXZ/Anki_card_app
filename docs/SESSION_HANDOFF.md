@@ -7,12 +7,12 @@
 | Project | Anki Card App |
 | Snapshot date | 2026-08-10 |
 | Branch | `main` |
-| Last completed commit | `6d7f7b8 Add installable PWA shell and review shortcuts` |
+| Last completed commit | `490b806 Document MVP status and session handoff` |
 | Local URL | `http://127.0.0.1:8000` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
-| Schema head | `20260810_0005` |
-| Test baseline | 71 passing, 95.48 percent coverage |
-| Product stage | Local MVP core loop complete, private-alpha hardening incomplete |
+| Schema head | `20260810_0006` |
+| Test baseline | 82 passing, 95.65 percent coverage |
+| Product stage | Local MVP core loop and authentication hardening slices complete |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -92,6 +92,10 @@ Important modules:
 | Path | Responsibility |
 |---|---|
 | `src/anki_card_app/app.py` | FastAPI application, static resources, PWA root routes |
+| `src/anki_card_app/auth.py` | Request-scoped identity and explicit development bypass |
+| `src/anki_card_app/auth_service.py` | Password credentials and server-side session lifecycle |
+| `src/anki_card_app/auth_web.py` | Login and logout routes |
+| `src/anki_card_app/security.py` | Session-bound CSRF, CSP, and browser security headers |
 | `src/anki_card_app/web.py` | Dashboard, manual cards, draft lifecycle, review pages |
 | `src/anki_card_app/imports_web.py` | Upload flow, model choice, generation background tasks and retries |
 | `src/anki_card_app/notes_web.py` | Imported-note ledger and note-to-card traceability |
@@ -103,7 +107,7 @@ Important modules:
 | `src/anki_card_app/analytics_service.py` | Dashboard and first-attempt recall metrics |
 | `src/anki_card_app/models.py` | SQLAlchemy domain model and database invariants |
 | `src/anki_card_app/static/` | CSS, keyboard behavior, PWA manifest, icons, service worker |
-| `migrations/versions/` | Ordered schema history through Skeleton Recall support |
+| `migrations/versions/` | Ordered schema history through authentication support |
 
 ## 5. Runtime and configuration
 
@@ -128,11 +132,20 @@ Current generation choices are hard-coded in `imports_web.py`:
 
 `OPENAI_MODEL` chooses the default radio selection, but it must be in the same allowlist. The provider uses the Responses API with Pydantic structured output and low reasoning effort.
 
+Authentication defaults to the explicit `AUTH_MODE=development` bypass locally.
+Password mode uses email credentials and opaque server-side sessions. Create or
+rotate accounts with `uv run anki-card-admin create-user --email ...` and
+`uv run anki-card-admin set-password --email ...`. Production configuration is
+rejected unless `AUTH_MODE=password` and `SESSION_COOKIE_SECURE=true`. See
+[Authentication Decision and Threat Model](AUTHENTICATION.md).
+
 ## 6. Routes and interfaces
 
 | Route | Method | Purpose |
 |---|---|---|
 | `/` | GET | Dashboard and learning metrics |
+| `/login` | GET, POST | Password authentication and session creation |
+| `/logout` | POST | Revoke the current session and delete its cookie |
 | `/imports` | GET | Import and generation history |
 | `/imports/new` | GET, POST | Upload note and choose generation model |
 | `/imports/{run_id}` | GET | Per-chunk run status and generated-card count |
@@ -160,6 +173,7 @@ There is no public JSON product API yet. The current product surface is server-r
 Core tables:
 
 - `user_accounts`
+- `auth_sessions`
 - `source_documents`
 - `source_chunks`
 - `generation_runs`
@@ -184,6 +198,10 @@ Do not violate these invariants:
 9. `ReviewLog.attempt_id` is globally unique and makes submission idempotent.
 10. Review logs and prior or new FSRS snapshots are append-only history.
 11. Stored timestamps are UTC. User timezone affects local-day boundaries and presentation.
+12. Password mode never falls back to the fixed development identity.
+13. Raw authentication session tokens are never persisted. Only SHA-256 digests are stored.
+14. Every POST validates a CSRF token derived from the current Session after login.
+15. Dynamic content is Jinja-autoescaped text. No template bypasses escaping.
 
 ## 8. Generation behavior
 
@@ -260,7 +278,7 @@ node --check src/anki_card_app/static/service-worker.js
 At the handoff snapshot:
 
 - 71 tests pass;
-- total branch-aware coverage is 95.48 percent;
+- total branch-aware coverage is 95.65 percent;
 - coverage threshold is 90 percent;
 - both PWA icons are valid PNG files at 192 by 192 and 512 by 512;
 - live manifest response type is `application/manifest+json`;
@@ -273,11 +291,12 @@ Tests use an isolated SQLite database through fixtures. Production-like PostgreS
 
 ### Release blockers
 
-- No authentication or invite lifecycle.
-- No complete route-level authorization audit for multiple real accounts.
+- No single-use invite acceptance, password recovery, or account deletion lifecycle.
+- The initial authorization matrix is implemented, but it must remain current as routes are added.
 - No durable job queue. In-process generation can be interrupted.
 - No production deployment, TLS, managed secrets, backups, or restoration exercise.
-- No comprehensive HTML or Markdown sanitization and Content Security Policy review.
+- Content is safely rendered as escaped text with a restrictive CSP. A future
+  Markdown-to-HTML renderer would still require an allowlist sanitizer.
 - No rate, token, or cost budget per import.
 - No standalone product-event instrumentation beyond the persisted domain records.
 - No implemented 30-day card-frequency metric for cards reviewed at least five times.
@@ -306,22 +325,24 @@ Tests use an isolated SQLite database through fixtures. Production-like PostgreS
 
 ## 13. Recommended next milestone
 
-The next rational unit of work is Milestone 5, authentication and private-alpha hardening. Do not start notifications or source synchronization first.
+Milestone 5 is in progress. Authentication, authorization, CSRF, CSP, and the
+current text-rendering boundary are complete. Do not start notifications or
+source synchronization first.
 
 Recommended order:
 
-1. Choose the identity provider and implement invite-only authentication.
-2. Replace the fixed development user with request-scoped identity.
-3. Audit every query and route for ownership enforcement.
-4. Add rendered-content sanitization and a Content Security Policy.
-5. Add import token or cost limits and observable generation cost.
-6. Move generation to a durable worker queue.
-7. Add source and card deletion with tested cascade behavior.
-8. Add database backup and restoration documentation, then exercise it.
-9. Run Playwright flows at mobile and desktop sizes.
-10. Perform an accessibility pass for focus, labels, contrast, and keyboard behavior.
+1. Implement single-use invite acceptance and administrative account lifecycle.
+2. Add login and import rate limits plus observable generation cost.
+3. Add source and card deletion with tested review-history behavior.
+4. Add database backup and restoration documentation, then exercise it.
+5. Prepare Railway deployment configuration and production acceptance checks.
+6. Move generation to a durable worker queue before multi-instance deployment.
+7. Run Playwright flows at mobile and desktop sizes.
+8. Perform an accessibility pass for focus, labels, contrast, and keyboard behavior.
 
-The first next-session deliverable should be an authentication decision record and threat model, followed by the smallest authenticated vertical slice. It should prove that two users cannot read or mutate each other's notes, cards, generation runs, review sessions, or metrics.
+The next-session deliverable should be single-use invite acceptance or the
+backup-and-deployment operations slice. Preserve the authorization and CSRF
+matrices as routes are added.
 
 ## 14. Definition of a safe handoff continuation
 

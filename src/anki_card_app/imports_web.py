@@ -43,6 +43,7 @@ from anki_card_app.models import (
     SourceDocument,
     utc_now,
 )
+from anki_card_app.security import validate_csrf
 from anki_card_app.web import current_user_id, templates
 
 router = APIRouter(prefix="/imports", tags=["imports"])
@@ -94,7 +95,7 @@ def _process_in_background(
 
 @router.get("", response_class=HTMLResponse)
 def import_list(request: Request, session: SessionDependency) -> HTMLResponse:
-    user_id = current_user_id(session)
+    user_id = current_user_id(request, session)
     runs = session.execute(
         select(GenerationRun, SourceDocument)
         .join(SourceDocument, SourceDocument.id == GenerationRun.source_document_id)
@@ -109,7 +110,8 @@ def import_list(request: Request, session: SessionDependency) -> HTMLResponse:
 
 
 @router.get("/new", response_class=HTMLResponse)
-def import_form(request: Request) -> HTMLResponse:
+def import_form(request: Request, session: SessionDependency) -> HTMLResponse:
+    current_user_id(request, session)
     settings = get_settings()
     selected_model = (
         settings.openai_model
@@ -123,7 +125,7 @@ def import_form(request: Request) -> HTMLResponse:
     )
 
 
-@router.post("/new")
+@router.post("/new", dependencies=[Depends(validate_csrf)])
 async def import_action(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -131,6 +133,7 @@ async def import_action(
     upload: Annotated[UploadFile, File()],
     model: Annotated[str, Form()] = "",
 ) -> Response:
+    user_id = current_user_id(request, session)
     settings = get_settings()
     selected_model = model.strip() or settings.openai_model
     if selected_model not in ALLOWED_GENERATION_MODELS:
@@ -143,7 +146,6 @@ async def import_action(
             ),
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
-    user_id = current_user_id(session)
     data = await upload.read(settings.max_upload_bytes + 1)
     limits = ImportLimits(
         max_upload_bytes=settings.max_upload_bytes,
@@ -223,14 +225,15 @@ async def import_action(
     return RedirectResponse(destination, status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.post("/{run_id}/retry")
+@router.post("/{run_id}/retry", dependencies=[Depends(validate_csrf)])
 def retry_import_generation(
+    request: Request,
     run_id: uuid.UUID,
     background_tasks: BackgroundTasks,
     session: SessionDependency,
 ) -> RedirectResponse:
     settings = get_settings()
-    user_id = current_user_id(session)
+    user_id = current_user_id(request, session)
     original = session.scalar(
         select(GenerationRun).where(
             GenerationRun.id == run_id,
@@ -295,7 +298,7 @@ def import_detail(
     run_id: uuid.UUID,
     session: SessionDependency,
 ) -> HTMLResponse:
-    user_id = current_user_id(session)
+    user_id = current_user_id(request, session)
     row = session.execute(
         select(GenerationRun, SourceDocument)
         .join(SourceDocument, SourceDocument.id == GenerationRun.source_document_id)

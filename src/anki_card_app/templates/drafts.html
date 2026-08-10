@@ -17,9 +17,9 @@
             <details class="source-evidence"><summary>Compare with source</summary><blockquote>{{ item.version.source_excerpt }}</blockquote>{% if item.version.ai_enrichment %}<p><b>Extra context:</b> {{ item.version.ai_enrichment }}</p>{% endif %}</details>
           {% endif %}
           <div class="actions">
-            <form action="/cards/{{ item.card.id }}/approve" method="post"><button class="button primary" type="submit">Approve</button></form>
+            <form action="/cards/{{ item.card.id }}/approve" method="post"><input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}"><button class="button primary" type="submit">Approve</button></form>
             <a class="button" href="/cards/{{ item.card.id }}/edit">Edit</a>
-            <form action="/cards/{{ item.card.id }}/reject" method="post"><button class="button danger" type="submit">Reject</button></form>
+            <form action="/cards/{{ item.card.id }}/reject" method="post"><input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}"><button class="button danger" type="submit">Reject</button></form>
           </div>
         </article>
       {% endfor %}

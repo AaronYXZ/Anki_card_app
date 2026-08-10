@@ -8,6 +8,7 @@
   </section>
   {% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
   <form method="post" enctype="multipart/form-data" class="card-form">
+    <input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}">
     <label>Markdown or ZIP file <input type="file" name="upload" accept=".md,.zip" required></label>
     <p class="muted">Folders inside ZIP files are preserved as source paths. Unsafe archive paths are rejected.</p>
     <fieldset class="model-picker">

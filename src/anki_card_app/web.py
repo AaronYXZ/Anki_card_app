@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import Response
 
 from anki_card_app.analytics_service import dashboard_metrics
+from anki_card_app.auth import get_current_user
 from anki_card_app.card_service import (
     CardContent,
     CardError,
@@ -26,7 +27,6 @@ from anki_card_app.card_service import (
     get_owned_card,
     reject_card,
 )
-from anki_card_app.config import get_settings
 from anki_card_app.database import get_session
 from anki_card_app.models import (
     Card,
@@ -44,7 +44,7 @@ from anki_card_app.review_service import (
     session_rating_counts,
     submit_review,
 )
-from anki_card_app.user_service import ensure_user
+from anki_card_app.security import validate_csrf
 
 PACKAGE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
@@ -62,15 +62,8 @@ class CardView:
     answer: str
 
 
-def current_user_id(session: Session) -> uuid.UUID:
-    settings = get_settings()
-    ensure_user(
-        session,
-        user_id=settings.development_user_id,
-        email=settings.development_user_email,
-    )
-    session.commit()
-    return settings.development_user_id
+def current_user_id(request: Request, session: Session) -> uuid.UUID:
+    return get_current_user(request, session).id
 
 
 def make_card_view(card: Card, version: CardVersion) -> CardView:
@@ -142,7 +135,7 @@ def raise_http_card_error(error: CardError) -> NoReturn:
 
 @router.get("/", response_class=HTMLResponse)
 def dashboard(request: Request, session: SessionDependency) -> HTMLResponse:
-    user_id = current_user_id(session)
+    user_id = current_user_id(request, session)
     metrics = dashboard_metrics(session, user_id=user_id)
     return templates.TemplateResponse(
         request=request,
@@ -157,7 +150,8 @@ def install_page(request: Request) -> HTMLResponse:
 
 
 @router.get("/cards/new", response_class=HTMLResponse)
-def new_card_form(request: Request) -> HTMLResponse:
+def new_card_form(request: Request, session: SessionDependency) -> HTMLResponse:
+    current_user_id(request, session)
     return templates.TemplateResponse(
         request=request,
         name="card_form.html",
@@ -165,7 +159,7 @@ def new_card_form(request: Request) -> HTMLResponse:
     )
 
 
-@router.post("/cards/new")
+@router.post("/cards/new", dependencies=[Depends(validate_csrf)])
 def create_card_action(
     request: Request,
     card_type: Annotated[str, Form()],
@@ -175,7 +169,7 @@ def create_card_action(
     cloze_text: Annotated[str, Form()] = "",
     back_extra: Annotated[str, Form()] = "",
 ) -> Response:
-    user_id = current_user_id(session)
+    user_id = current_user_id(request, session)
     form_values = {
         "card_type": card_type,
         "front": front,
@@ -215,7 +209,7 @@ def create_card_action(
 
 @router.get("/cards/drafts", response_class=HTMLResponse)
 def draft_inbox(request: Request, session: SessionDependency) -> HTMLResponse:
-    user_id = current_user_id(session)
+    user_id = current_user_id(request, session)
     cards = card_views_for_state(session, user_id=user_id, card_state=CardState.DRAFT)
     return templates.TemplateResponse(
         request=request,
@@ -230,7 +224,7 @@ def edit_card_form(
     card_id: uuid.UUID,
     session: SessionDependency,
 ) -> HTMLResponse:
-    user_id = current_user_id(session)
+    user_id = current_user_id(request, session)
     try:
         card = get_owned_card(session, user_id=user_id, card_id=card_id)
         version = get_current_version(session, card)
@@ -243,7 +237,7 @@ def edit_card_form(
     )
 
 
-@router.post("/cards/{card_id}/edit")
+@router.post("/cards/{card_id}/edit", dependencies=[Depends(validate_csrf)])
 def edit_card_action(
     request: Request,
     card_id: uuid.UUID,
@@ -253,7 +247,7 @@ def edit_card_action(
     cloze_text: Annotated[str, Form()] = "",
     back_extra: Annotated[str, Form()] = "",
 ) -> Response:
-    user_id = current_user_id(session)
+    user_id = current_user_id(request, session)
     try:
         card = get_owned_card(session, user_id=user_id, card_id=card_id)
         edit_card(
@@ -292,9 +286,11 @@ def edit_card_action(
     return RedirectResponse(destination, status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.post("/cards/{card_id}/approve")
-def approve_card_action(card_id: uuid.UUID, session: SessionDependency) -> RedirectResponse:
-    user_id = current_user_id(session)
+@router.post("/cards/{card_id}/approve", dependencies=[Depends(validate_csrf)])
+def approve_card_action(
+    request: Request, card_id: uuid.UUID, session: SessionDependency
+) -> RedirectResponse:
+    user_id = current_user_id(request, session)
     next_card_id = adjacent_draft_id(session, user_id=user_id, card_id=card_id)
     try:
         approve_card(session, user_id=user_id, card_id=card_id)
@@ -305,9 +301,11 @@ def approve_card_action(card_id: uuid.UUID, session: SessionDependency) -> Redir
     return RedirectResponse(draft_destination(next_card_id), status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.post("/cards/{card_id}/reject")
-def reject_card_action(card_id: uuid.UUID, session: SessionDependency) -> RedirectResponse:
-    user_id = current_user_id(session)
+@router.post("/cards/{card_id}/reject", dependencies=[Depends(validate_csrf)])
+def reject_card_action(
+    request: Request, card_id: uuid.UUID, session: SessionDependency
+) -> RedirectResponse:
+    user_id = current_user_id(request, session)
     next_card_id = adjacent_draft_id(session, user_id=user_id, card_id=card_id)
     try:
         reject_card(session, user_id=user_id, card_id=card_id)
@@ -329,7 +327,7 @@ def raise_http_review_error(error: ReviewError) -> NoReturn:
 
 @router.get("/review", response_class=HTMLResponse)
 def review_page(request: Request, session: SessionDependency) -> HTMLResponse:
-    user_id = current_user_id(session)
+    user_id = current_user_id(request, session)
     review_session = get_or_create_daily_session(session, user_id=user_id)
     if review_session is None:
         session.commit()
@@ -360,13 +358,17 @@ def review_page(request: Request, session: SessionDependency) -> HTMLResponse:
     )
 
 
-@router.post("/review/{session_id}/{card_id}/reveal")
+@router.post(
+    "/review/{session_id}/{card_id}/reveal",
+    dependencies=[Depends(validate_csrf)],
+)
 def reveal_review_answer(
+    request: Request,
     session_id: uuid.UUID,
     card_id: uuid.UUID,
     session: SessionDependency,
 ) -> RedirectResponse:
-    user_id = current_user_id(session)
+    user_id = current_user_id(request, session)
     try:
         reveal_answer(
             session,
@@ -381,15 +383,19 @@ def reveal_review_answer(
     return RedirectResponse("/review", status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.post("/review/{session_id}/{card_id}/rate")
+@router.post(
+    "/review/{session_id}/{card_id}/rate",
+    dependencies=[Depends(validate_csrf)],
+)
 def rate_review_card(
+    request: Request,
     session_id: uuid.UUID,
     card_id: uuid.UUID,
     rating: Annotated[int, Form()],
     attempt_id: Annotated[uuid.UUID, Form()],
     session: SessionDependency,
 ) -> RedirectResponse:
-    user_id = current_user_id(session)
+    user_id = current_user_id(request, session)
     try:
         result = submit_review(
             session,
@@ -413,7 +419,7 @@ def review_session_summary(
     session_id: uuid.UUID,
     session: SessionDependency,
 ) -> HTMLResponse:
-    user_id = current_user_id(session)
+    user_id = current_user_id(request, session)
     try:
         counts = session_rating_counts(session, user_id=user_id, session_id=session_id)
     except ReviewError as error:

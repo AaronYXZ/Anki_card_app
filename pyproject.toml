@@ -21,6 +21,9 @@ dependencies = [
   "uvicorn[standard]>=0.35",
 ]
 
+[project.scripts]
+anki-card-admin = "anki_card_app.admin:main"
+
 [dependency-groups]
 dev = [
   "httpx2>=2.0",

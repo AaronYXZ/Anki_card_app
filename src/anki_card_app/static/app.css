@@ -18,6 +18,8 @@ kbd { display: inline-block; min-width: 1.5rem; padding: 0.1rem 0.35rem; border:
 .site-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem max(1.25rem, calc((100vw - 68rem) / 2)); border-bottom: 1px solid var(--line); background: rgb(255 253 247 / 92%); }
 .site-header nav { display: flex; gap: 1rem; }
 .site-header nav a, .brand { text-decoration: none; }
+.site-header nav form { margin: 0; }
+.nav-button { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .brand { font-weight: 800; letter-spacing: -0.02em; }
 .container { width: min(68rem, calc(100% - 2rem)); margin: 0 auto; padding: 4rem 0; }
 .hero, .page-heading { max-width: 48rem; }
@@ -51,8 +53,9 @@ kbd { display: inline-block; min-width: 1.5rem; padding: 0.1rem 0.35rem; border:
 .model-picker label { padding: 0.9rem; border: 1px solid var(--line); border-radius: 0.65rem; background: white; cursor: pointer; }
 .model-picker label:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 3px rgb(36 92 69 / 12%); }
 .model-picker span, .model-picker small { display: block; }
-textarea { width: 100%; resize: vertical; padding: 0.8rem; border: 1px solid var(--line); border-radius: 0.6rem; background: white; color: var(--ink); font: inherit; line-height: 1.5; }
-textarea:focus { outline: 3px solid rgb(36 92 69 / 18%); border-color: var(--accent); }
+textarea, input[type="email"], input[type="password"] { width: 100%; padding: 0.8rem; border: 1px solid var(--line); border-radius: 0.6rem; background: white; color: var(--ink); font: inherit; line-height: 1.5; }
+textarea { resize: vertical; }
+textarea:focus, input[type="email"]:focus, input[type="password"]:focus { outline: 3px solid rgb(36 92 69 / 18%); border-color: var(--accent); }
 .card-form input[type="file"] { width: 100%; padding: 0.8rem; border: 1px dashed var(--line); border-radius: 0.6rem; background: white; }
 .muted, small { color: var(--muted); }
 .notice.error { max-width: 48rem; margin-top: 1rem; padding: 1rem; border-left: 4px solid var(--danger); background: #fff1ef; }

@@ -29,9 +29,16 @@ Implemented capabilities:
 - persist idempotent FSRS-6 reviews and complete scheduling history;
 - show daily counts and a 30-day first-attempt recall metric;
 - install the interface as a PWA on supported mobile and desktop browsers;
+- authenticate private-alpha users with revocable server-side sessions;
+- isolate every existing notes, cards, imports, reviews, and metrics route by request identity;
+- require Session-bound CSRF tokens for every mutation;
+- escape user and model content as text and enforce restrictive browser security headers;
 - use `Space` to reveal an answer and `1` through `4` to rate it.
 
-This is not yet private-alpha ready. The current build uses one fixed development user. Authentication, durable background jobs, production deployment, content sanitization, notification delivery, backups, and full mobile or accessibility acceptance testing remain open.
+This is not yet private-alpha ready. Authentication, authorization, CSRF, CSP,
+and text-rendering boundaries are implemented, but invite acceptance, password
+recovery, login rate limits, durable background jobs, production deployment,
+backups, and full mobile or accessibility acceptance testing remain open.
 
 ## Technology
 
@@ -68,6 +75,25 @@ OPENAI_API_KEY=your_api_key_here
 ```
 
 Do not commit `.env`. Restart the application after changing environment variables.
+
+Local development defaults to `AUTH_MODE=development`, which explicitly keeps
+the fixed development account. To exercise password authentication locally:
+
+```bash
+uv run alembic upgrade head
+uv run anki-card-admin create-user --email you@example.com
+```
+
+Then change `.env` and restart Uvicorn:
+
+```dotenv
+AUTH_MODE=password
+SESSION_COOKIE_SECURE=false
+```
+
+Open `/login`. Passwords must contain at least 12 characters. Use
+`uv run anki-card-admin set-password --email you@example.com` to change a
+password and revoke every session for that account.
 
 Open these local pages:
 
@@ -112,6 +138,11 @@ See [.env.example](.env.example) for every setting. The most important values ar
 
 | Variable | Purpose | Default |
 |---|---|---|
+| `AUTH_MODE` | Explicit development bypass or password authentication | `development` |
+| `SESSION_COOKIE_NAME` | Authentication cookie name | `anki_session` |
+| `CSRF_COOKIE_NAME` | Pre-login and development CSRF cookie name | `anki_csrf` |
+| `SESSION_LIFETIME_DAYS` | Absolute session lifetime | `30` |
+| `SESSION_COOKIE_SECURE` | Restrict the cookie to HTTPS | `false` |
 | `DATABASE_URL` | PostgreSQL connection | local Compose database on port 5433 |
 | `OPENAI_API_KEY` | Enables card generation | empty |
 | `OPENAI_MODEL` | Default import model | `gpt-5.6-terra` |
@@ -131,10 +162,10 @@ uv run mypy src
 uv run pytest --cov=anki_card_app --cov-report=term-missing
 ```
 
-Current verified baseline at commit `6d7f7b8`:
+Current verified working-tree baseline:
 
-- 71 tests passing;
-- 95.48 percent total coverage;
+- 82 tests passing;
+- 95.65 percent total coverage;
 - Ruff, Mypy, JavaScript syntax, manifest parsing, and live PWA endpoint checks passing.
 
 ## Important constraints
@@ -142,7 +173,8 @@ Current verified baseline at commit `6d7f7b8`:
 - Imported notes are immutable snapshots. Source-file change detection and automatic card reconciliation are deferred.
 - AI output is always a draft. It never enters the review queue without user approval.
 - Generation currently runs in FastAPI in-process background tasks. A process restart can interrupt it.
-- One fixed development account owns all local data. Do not deploy this build for multiple users.
+- The fixed account exists only in explicit development auth mode. Production settings require password auth and secure cookies.
+- Dynamic content is rendered as escaped text. Any future Markdown-to-HTML feature must introduce and test an allowlist sanitizer before using trusted markup.
 - Static assets work offline, but database writes do not.
 - The application does not synchronize with Anki or scan an arbitrary Obsidian directory.
 
@@ -151,5 +183,6 @@ Current verified baseline at commit `6d7f7b8`:
 - [Product requirements](docs/PRD.md)
 - [Development plan](docs/DEVELOPMENT_PLAN.md)
 - [Session handoff specification](docs/SESSION_HANDOFF.md)
+- [Authentication decision and threat model](docs/AUTHENTICATION.md)
 
 The handoff specification is the canonical starting point for the next development session. It records the current architecture, invariants, known gaps, validation state, and recommended next task.
