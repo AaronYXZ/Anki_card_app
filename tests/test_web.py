@@ -22,6 +22,7 @@ def test_dashboard_and_empty_workflows(client: TestClient) -> None:
     drafts = client.get("/cards/drafts")
     review = client.get("/review")
     new_card = client.get("/cards/new")
+    install = client.get("/install")
 
     assert dashboard.status_code == 200
     assert "0 cards are ready" in dashboard.text
@@ -31,6 +32,11 @@ def test_dashboard_and_empty_workflows(client: TestClient) -> None:
     assert "Nothing is due" in review.text
     assert "Create a card" in new_card.text
     assert "Skeleton Recall" in new_card.text
+    assert install.status_code == 200
+    assert "Add to Home Screen" in install.text
+    assert "Online connection required" in install.text
+    assert "/manifest.webmanifest" in install.text
+    assert "/static/app.js" in install.text
 
 
 def test_normal_card_create_edit_approve_and_review(
@@ -90,6 +96,8 @@ def test_normal_card_create_edit_approve_and_review(
     review = client.get("/review")
     assert "Define statistical power." in review.text
     assert "It equals one minus beta." not in review.text
+    assert 'data-shortcut="Space"' in review.text
+    assert "<kbd>Space</kbd>" in review.text
     review_session = db_session.scalar(select(ReviewSession))
     assert review_session is not None
 
@@ -101,6 +109,8 @@ def test_normal_card_create_edit_approve_and_review(
     revealed_page = client.get("/review")
     assert "It equals one minus beta." in revealed_page.text
     assert "Again" in revealed_page.text
+    assert 'data-shortcut="1"' in revealed_page.text
+    assert 'data-shortcut="4"' in revealed_page.text
     attempt_match = re.search(r'name="attempt_id" value="([^"]+)"', revealed_page.text)
     assert attempt_match is not None
 

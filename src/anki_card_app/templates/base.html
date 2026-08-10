@@ -3,9 +3,15 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#245c45">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>{% block title %}Anki Card App{% endblock %}</title>
     <link rel="icon" href="{{ url_for('static', path='/favicon.svg') }}" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="{{ url_for('static', path='/icon-192.png') }}">
+    <link rel="manifest" href="/manifest.webmanifest">
     <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}">
+    <script src="{{ url_for('static', path='/app.js') }}" defer></script>
     {% block head_extra %}{% endblock %}
   </head>
   <body>
@@ -17,6 +23,7 @@
         <a href="/cards/new">New card</a>
         <a href="/cards/drafts">Drafts</a>
         <a href="/review">Review</a>
+        <a href="/install">Install</a>
       </nav>
     </header>
     <main class="container">

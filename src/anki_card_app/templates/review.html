@@ -17,12 +17,12 @@
             <form action="/review/{{ entry.session.id }}/{{ entry.card.id }}/rate" method="post">
               <input type="hidden" name="attempt_id" value="{{ attempt_id }}">
               <input type="hidden" name="rating" value="{{ value }}">
-              <button class="rating rating-{{ value }}" type="submit"><b>{{ label }}</b><small>{{ meaning }}</small></button>
+              <button class="rating rating-{{ value }}" type="submit" data-shortcut="{{ value }}"><b>{{ label }} <kbd>{{ value }}</kbd></b><small>{{ meaning }}</small></button>
             </form>
           {% endfor %}
         </div>
       {% else %}
-        <form action="/review/{{ entry.session.id }}/{{ entry.card.id }}/reveal" method="post"><button class="button primary" type="submit">Show answer</button></form>
+        <form action="/review/{{ entry.session.id }}/{{ entry.card.id }}/reveal" method="post"><button class="button primary" type="submit" data-shortcut="Space">Show answer <kbd>Space</kbd></button></form>
       {% endif %}
     </article>
   {% else %}

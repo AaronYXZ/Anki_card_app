@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Install · Anki Card App{% endblock %}
+{% block content %}
+  <section class="page-heading">
+    <p class="eyebrow">Installable PWA</p>
+    <h1>Keep review one tap away</h1>
+    <p>Install the learning system on your home screen or desktop. It opens in a standalone window and keeps the application shell fast.</p>
+  </section>
+  <div class="install-grid">
+    <article class="install-card">
+      <h2>iPhone or iPad</h2>
+      <ol><li>Open this site in Safari.</li><li>Tap the Share button.</li><li>Choose Add to Home Screen.</li><li>Confirm with Add.</li></ol>
+    </article>
+    <article class="install-card">
+      <h2>Desktop Chrome</h2>
+      <ol><li>Open this site in Chrome.</li><li>Open the browser menu.</li><li>Choose Install Anki Card App.</li><li>Confirm Install.</li></ol>
+    </article>
+    <article class="install-card">
+      <h2>Review shortcuts</h2>
+      <ul><li><kbd>Space</kbd> reveals the answer.</li><li><kbd>1</kbd> Again</li><li><kbd>2</kbd> Hard</li><li><kbd>3</kbd> Good</li><li><kbd>4</kbd> Easy</li></ul>
+    </article>
+  </div>
+  <div class="notice offline-notice" role="note"><b>Online connection required.</b> Static interface assets are cached, but imports, approvals, and review ratings are written to the server and are not supported offline.</div>
+{% endblock %}

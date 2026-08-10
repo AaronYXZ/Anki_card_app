@@ -14,6 +14,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--background); color: var(--ink); }
 a { color: inherit; }
+kbd { display: inline-block; min-width: 1.5rem; padding: 0.1rem 0.35rem; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 0.3rem; background: white; color: var(--muted); font: 0.72rem/1.2 ui-monospace, monospace; text-align: center; }
 .site-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem max(1.25rem, calc((100vw - 68rem) / 2)); border-bottom: 1px solid var(--line); background: rgb(255 253 247 / 92%); }
 .site-header nav { display: flex; gap: 1rem; }
 .site-header nav a, .brand { text-decoration: none; }
@@ -55,6 +56,7 @@ textarea:focus { outline: 3px solid rgb(36 92 69 / 18%); border-color: var(--acc
 .card-form input[type="file"] { width: 100%; padding: 0.8rem; border: 1px dashed var(--line); border-radius: 0.6rem; background: white; }
 .muted, small { color: var(--muted); }
 .notice.error { max-width: 48rem; margin-top: 1rem; padding: 1rem; border-left: 4px solid var(--danger); background: #fff1ef; }
+.offline-notice { max-width: none; margin-top: 2rem; padding: 1rem; border-left: 4px solid var(--accent); background: #edf5ef; }
 .card-list { display: grid; gap: 1rem; }
 .draft-card h2, .review-card h2 { white-space: pre-wrap; line-height: 1.35; }
 .card-meta { display: flex; align-items: center; gap: 0.75rem; color: var(--muted); font-size: 0.85rem; }
@@ -91,6 +93,10 @@ textarea:focus { outline: 3px solid rgb(36 92 69 / 18%); border-color: var(--acc
 .chunk-list article { flex-wrap: wrap; }
 .chunk-list article .error-text { flex-basis: 100%; margin: 0; color: var(--danger); }
 .status-failed, .status-partial { background: #fff1ef; color: var(--danger); }
+.install-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 2rem; }
+.install-card { padding: 1.4rem; border: 1px solid var(--line); border-radius: 0.9rem; background: var(--surface); }
+.install-card h2 { margin-top: 0; }
+.install-card li { margin-top: 0.65rem; line-height: 1.45; }
 
 @media (max-width: 42rem) {
   .site-header { align-items: flex-start; }
@@ -99,4 +105,5 @@ textarea:focus { outline: 3px solid rgb(36 92 69 / 18%); border-color: var(--acc
   .metrics { grid-template-columns: repeat(2, 1fr); margin-top: 2.5rem; }
   .rating-grid { grid-template-columns: repeat(2, 1fr); }
   .note-row { align-items: flex-start; }
+  .install-grid { grid-template-columns: 1fr; }
 }

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from anki_card_app.config import get_settings
@@ -23,6 +24,24 @@ def create_app() -> FastAPI:
     application.include_router(web_router)
     application.include_router(imports_router)
     application.include_router(notes_router)
+
+    @application.get("/manifest.webmanifest", include_in_schema=False)
+    def manifest() -> FileResponse:
+        return FileResponse(
+            static_directory / "manifest.webmanifest",
+            media_type="application/manifest+json",
+        )
+
+    @application.get("/service-worker.js", include_in_schema=False)
+    def service_worker() -> FileResponse:
+        return FileResponse(
+            static_directory / "service-worker.js",
+            media_type="application/javascript",
+            headers={
+                "Cache-Control": "no-cache",
+                "Service-Worker-Allowed": "/",
+            },
+        )
 
     @application.get("/health", tags=["system"])
     def health() -> dict[str, str]:

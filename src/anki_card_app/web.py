@@ -151,6 +151,11 @@ def dashboard(request: Request, session: SessionDependency) -> HTMLResponse:
     )
 
 
+@router.get("/install", response_class=HTMLResponse)
+def install_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request=request, name="install.html", context={})
+
+
 @router.get("/cards/new", response_class=HTMLResponse)
 def new_card_form(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(

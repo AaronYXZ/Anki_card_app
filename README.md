@@ -6,13 +6,13 @@ An AI-assisted spaced-repetition learning system that turns Obsidian notes into 
 
 1. Import Markdown notes from Obsidian.
 2. Generate Normal, Cloze, and Skeleton Recall cards.
-3. Review due cards in a PWA.
+3. Review due cards in an installable PWA.
 4. Persist review history and schedule future reviews with FSRS.
 5. Send daily review reminders and generate learning reports.
 
 ## Status
 
-Milestone 3's local implementation is complete. The application can safely import notes, generate and review draft cards, build a due-first daily queue, and persist Again, Hard, Good, or Easy ratings through FSRS 6. Every review stores the prior and updated scheduling state and is protected by an idempotent attempt identifier. A live OpenAI provider smoke test still requires an `OPENAI_API_KEY`.
+Milestone 3's local implementation is complete. The application can safely import notes, generate and review draft cards, build a due-first daily queue, and persist Again, Hard, Good, or Easy ratings through FSRS 6. Every review stores the prior and updated scheduling state and is protected by an idempotent attempt identifier. The web app is installable from a supported browser and caches its static shell for a clear offline fallback. Review and database writes still require a network connection. A live OpenAI provider smoke test still requires an `OPENAI_API_KEY`.
 
 ## Local development
 
@@ -39,6 +39,8 @@ The local product workflow is available at [http://localhost:8000](http://localh
 2. Review, edit, approve, or reject the draft.
 3. Open Review, recall the answer, reveal it, and choose Again, Hard, Good, or Easy.
 4. Complete the session and inspect the rating summary. FSRS schedules each next review automatically.
+
+Open [http://localhost:8000/install](http://localhost:8000/install) for iPhone, iPad, and desktop installation instructions. During review, press `Space` to reveal the answer, then use `1`, `2`, `3`, or `4` for Again, Hard, Good, or Easy.
 
 To generate drafts from notes, set `OPENAI_API_KEY` in `.env`, open `/imports`, choose Terra or Luna, and upload a Markdown file or a ZIP of Markdown files. Skeleton Recall is selected for complete stories, frameworks, designs, and multi-step processes. Normal and Cloze remain preferred for explanations and atomic facts. `OPENAI_MODEL` controls the default selection. Without an API key, imports are still validated and stored, and the run shows a clear configuration error.
 
