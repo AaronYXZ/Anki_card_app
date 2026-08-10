@@ -70,6 +70,7 @@ def test_normal_card_create_edit_approve_and_review(
         follow_redirects=False,
     )
     assert edited.status_code == 303
+    assert edited.headers["location"] == f"/cards/drafts#card-{card.id}"
     versions = db_session.scalars(
         select(CardVersion)
         .where(CardVersion.card_id == card.id)
@@ -132,6 +133,7 @@ def test_cloze_card_rendering_and_rejection(client: TestClient, db_session: Sess
 
     rejected = client.post(f"/cards/{card.id}/reject", follow_redirects=False)
     assert rejected.status_code == 303
+    assert rejected.headers["location"] == "/cards/drafts"
     db_session.refresh(card)
     assert card.state is CardState.REJECTED
     assert "No drafts waiting" in client.get("/cards/drafts").text
@@ -152,6 +154,32 @@ def test_invalid_card_type_and_missing_card_errors(client: TestClient) -> None:
     assert missing_edit.status_code == 404
     assert missing_approve.status_code == 404
     assert missing_reject.status_code == 404
+
+
+def test_draft_actions_redirect_to_adjacent_card(client: TestClient, db_session: Session) -> None:
+    for number in range(3):
+        response = client.post(
+            "/cards/new",
+            data={
+                "card_type": "normal",
+                "front": f"Question {number}",
+                "back": f"Answer {number}",
+            },
+        )
+        assert response.status_code == 200
+
+    cards = db_session.scalars(
+        select(Card).where(Card.state == CardState.DRAFT).order_by(Card.created_at.desc(), Card.id)
+    ).all()
+    assert len(cards) == 3
+
+    approved = client.post(f"/cards/{cards[0].id}/approve", follow_redirects=False)
+    assert approved.headers["location"] == f"/cards/drafts#card-{cards[1].id}"
+
+    rejected = client.post(f"/cards/{cards[2].id}/reject", follow_redirects=False)
+    assert rejected.headers["location"] == f"/cards/drafts#card-{cards[1].id}"
+    page = client.get("/cards/drafts")
+    assert f'id="card-{cards[1].id}"' in page.text
 
 
 def test_development_user_is_created_once(client: TestClient, db_session: Session) -> None:

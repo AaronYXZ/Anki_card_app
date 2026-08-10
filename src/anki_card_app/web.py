@@ -103,6 +103,31 @@ def card_views_for_state(
     return [make_card_view(card, version) for card, version in rows]
 
 
+def adjacent_draft_id(
+    session: Session, *, user_id: uuid.UUID, card_id: uuid.UUID
+) -> uuid.UUID | None:
+    draft_ids = list(
+        session.scalars(
+            select(Card.id)
+            .where(Card.user_id == user_id, Card.state == CardState.DRAFT)
+            .order_by(Card.created_at.desc(), Card.id)
+        )
+    )
+    try:
+        position = draft_ids.index(card_id)
+    except ValueError:
+        return None
+    if position + 1 < len(draft_ids):
+        return draft_ids[position + 1]
+    if position > 0:
+        return draft_ids[position - 1]
+    return None
+
+
+def draft_destination(card_id: uuid.UUID | None = None) -> str:
+    return f"/cards/drafts#card-{card_id}" if card_id is not None else "/cards/drafts"
+
+
 def parse_card_type(value: str) -> CardType:
     try:
         return CardType(value)
@@ -280,32 +305,34 @@ def edit_card_action(
             },
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
-    destination = "/cards/drafts" if card.state is CardState.DRAFT else "/review"
+    destination = draft_destination(card.id) if card.state is CardState.DRAFT else "/review"
     return RedirectResponse(destination, status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/cards/{card_id}/approve")
 def approve_card_action(card_id: uuid.UUID, session: SessionDependency) -> RedirectResponse:
     user_id = current_user_id(session)
+    next_card_id = adjacent_draft_id(session, user_id=user_id, card_id=card_id)
     try:
         approve_card(session, user_id=user_id, card_id=card_id)
         session.commit()
     except CardError as error:
         session.rollback()
         raise_http_card_error(error)
-    return RedirectResponse("/cards/drafts", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(draft_destination(next_card_id), status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/cards/{card_id}/reject")
 def reject_card_action(card_id: uuid.UUID, session: SessionDependency) -> RedirectResponse:
     user_id = current_user_id(session)
+    next_card_id = adjacent_draft_id(session, user_id=user_id, card_id=card_id)
     try:
         reject_card(session, user_id=user_id, card_id=card_id)
         session.commit()
     except CardError as error:
         session.rollback()
         raise_http_card_error(error)
-    return RedirectResponse("/cards/drafts", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(draft_destination(next_card_id), status_code=status.HTTP_303_SEE_OTHER)
 
 
 def raise_http_review_error(error: ReviewError) -> NoReturn:

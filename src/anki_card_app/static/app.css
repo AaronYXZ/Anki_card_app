@@ -36,6 +36,7 @@ a { color: inherit; }
 .metrics strong { font-size: 2rem; }
 .metrics span { margin-top: 0.3rem; color: var(--muted); }
 .card-form, .draft-card, .review-card, .empty-state { margin-top: 2rem; padding: clamp(1.25rem, 4vw, 2.25rem); border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); box-shadow: 0 0.6rem 2rem rgb(44 48 42 / 5%); }
+.draft-card { scroll-margin-top: 1rem; }
 .card-form { max-width: 48rem; }
 .card-form label { display: grid; gap: 0.45rem; margin-top: 1.25rem; font-weight: 700; }
 .card-form fieldset { display: flex; gap: 1.25rem; border: 0; padding: 0; }

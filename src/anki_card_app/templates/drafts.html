@@ -9,7 +9,7 @@
   {% if cards %}
     <div class="card-list">
       {% for item in cards %}
-        <article class="draft-card">
+        <article class="draft-card" id="card-{{ item.card.id }}">
           <div class="card-meta"><span class="pill">{{ item.card.card_type.value }}</span><span>Version {{ item.version.version_number }}</span></div>
           <h2>{{ item.prompt }}</h2>
           <div class="answer-preview">{{ item.answer }}</div>
