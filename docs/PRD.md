@@ -182,9 +182,14 @@ Acceptance criteria:
 
 ### FR-2. Generate draft cards
 
-- Support `normal` and `cloze` card types.
+- Support `normal`, `cloze`, and `skeleton_recall` card types.
 - Use concepts and explanations for Normal cards.
 - Use terms, formulas, ordered steps, and precise facts for Cloze cards.
+- Use Skeleton Recall for complete stories, designs, frameworks, root cause analyses, and
+  multi-step processes where the learner should reconstruct order, reasoning, evidence,
+  and examples without memorizing exact wording.
+- Keep Skeleton Recall fronts to a title and major outline. Complete the same outline with
+  compact bullets on the back.
 - Generate no more than one default card for the same atomic fact.
 - Require structured JSON output from the model.
 - Store model identifier, prompt version, input hash, latency, and validation result.
@@ -202,6 +207,7 @@ Acceptance criteria:
 - Allow approve, reject, edit, and undo for the current session.
 - Normal cards require non-empty `front` and `back`.
 - Cloze cards require at least one valid `{{c1::...}}` deletion.
+- Skeleton Recall cards require a non-empty outline `front` and completed `back`.
 - Preserve original generated content after edits.
 - Allow preview using the same renderer as the review screen.
 

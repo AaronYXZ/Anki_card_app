@@ -5,7 +5,7 @@ An AI-assisted spaced-repetition learning system that turns Obsidian notes into 
 ## Planned workflow
 
 1. Import Markdown notes from Obsidian.
-2. Generate question-and-answer and cloze cards.
+2. Generate Normal, Cloze, and Skeleton Recall cards.
 3. Review due cards in a PWA.
 4. Persist review history and schedule future reviews with FSRS.
 5. Send daily review reminders and generate learning reports.
@@ -35,12 +35,12 @@ Open [http://localhost:8000/health](http://localhost:8000/health) to verify the 
 
 The local product workflow is available at [http://localhost:8000](http://localhost:8000):
 
-1. Create a Normal or Cloze draft.
+1. Create a Normal, Cloze, or Skeleton Recall draft.
 2. Review, edit, approve, or reject the draft.
 3. Open Review, recall the answer, reveal it, and choose Again, Hard, Good, or Easy.
 4. Complete the session and inspect the rating summary. FSRS schedules each next review automatically.
 
-To generate drafts from notes, set `OPENAI_API_KEY` in `.env`, open `/imports`, and upload a Markdown file or a ZIP of Markdown files. Generation uses `gpt-5.6-terra` by default because card generation is a high-volume workload where balanced quality and cost matter. Override `OPENAI_MODEL` if needed. Without an API key, imports are still validated and stored, and the run shows a clear configuration error.
+To generate drafts from notes, set `OPENAI_API_KEY` in `.env`, open `/imports`, choose Terra or Luna, and upload a Markdown file or a ZIP of Markdown files. Skeleton Recall is selected for complete stories, frameworks, designs, and multi-step processes. Normal and Cloze remain preferred for explanations and atomic facts. `OPENAI_MODEL` controls the default selection. Without an API key, imports are still validated and stored, and the run shows a clear configuration error.
 
 Generation progress is committed after every chunk and active run pages refresh every five seconds. Each OpenAI request times out after 90 seconds and is retried once by the generation workflow. Authentication, model-access, and exhausted-credit errors stop the run immediately. After correcting the configuration or adding API credits, use **Resume generation** to create a fresh run without duplicating successful cards.
 

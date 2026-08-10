@@ -29,6 +29,7 @@ def utc_now() -> datetime:
 class CardType(StrEnum):
     NORMAL = "normal"
     CLOZE = "cloze"
+    SKELETON_RECALL = "skeleton_recall"
 
 
 class CardState(StrEnum):
@@ -168,6 +169,10 @@ class Card(Base):
     __tablename__ = "cards"
     __table_args__ = (
         UniqueConstraint("user_id", "content_fingerprint", name="uq_cards_user_fingerprint"),
+        CheckConstraint(
+            "card_type IN ('normal', 'cloze', 'skeleton_recall')",
+            name="ck_cards_card_type",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)

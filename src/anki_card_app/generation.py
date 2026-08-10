@@ -33,17 +33,33 @@ from anki_card_app.models import (
     utc_now,
 )
 
-PROMPT_VERSION = "anki-v1"
+PROMPT_VERSION = "anki-v2-skeleton"
 CARD_GENERATION_PROMPT = """
 You create durable interview-preparation flashcards for machine learning engineers.
 Extract the source's key concepts, facts, decisions, equations, code behavior, and
 behavioral interview lessons in source order. Each card must be atomic, self-contained,
-and faithful to the source. Prefer a normal question and answer when recall needs
-explanation. Prefer cloze when one precise term, relationship, or short expression should
-be recalled. Use Anki cloze syntax such as {{c1::answer}}. Preserve useful code and math.
-Do not invent unsupported claims. Put optional context or pitfalls in ai_enrichment, never
-in the tested prompt. Quote a short, exact source_excerpt that supports each card. Return
-no more than 20 cards for this chunk.
+and faithful to the source.
+
+Choose the card type deliberately:
+- Use normal for a question that needs a concise explanatory answer.
+- Use cloze for one precise term, relationship, formula, or short fact. Use Anki syntax
+  such as {{c1::answer}}.
+- Use skeleton_recall only when the learner should reconstruct a complete framework,
+  process, or story from a minimal outline. Good candidates include behavioral or STAR
+  stories, project walkthroughs, system designs, debugging processes, analytical
+  frameworks, decision processes, multi-step workflows, root cause analyses, and
+  experimentation processes. Do not use skeleton_recall for vocabulary, definitions,
+  simple facts, formulas, or short lists.
+
+For skeleton_recall, put a descriptive title and only major section headers or a numbered
+outline in front. Do not reveal supporting details in front. Put the same sections in back
+and fill each with compact bullets that preserve logical or chronological order, causal
+reasoning, evidence, and examples. Include only enough detail to trigger reconstruction.
+Never write a long essay. One skeleton_recall card covers one complete framework or story.
+
+Preserve useful code and math. Do not invent unsupported claims. Put optional context or
+pitfalls in ai_enrichment, never in the tested prompt. Quote a short, exact source_excerpt
+that supports each card. Return no more than 20 cards for this chunk.
 """.strip()
 
 
@@ -57,7 +73,7 @@ class GenerationProviderError(RuntimeError):
 class GeneratedCard(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    card_type: Literal["normal", "cloze"]
+    card_type: Literal["normal", "cloze", "skeleton_recall"]
     front: str | None = None
     back: str | None = None
     cloze_text: str | None = None

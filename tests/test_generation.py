@@ -44,20 +44,33 @@ class FakeGenerator:
         if chunk.sequence in self.fail_sequences:
             raise RuntimeError(f"failure for chunk {chunk.sequence}")
         if chunk.sequence == 0:
-            card = GeneratedCard(
-                card_type="normal",
-                front="What is statistical power?",
-                back="The probability of detecting a real effect.",
-                source_excerpt="Power is the probability of detecting a real effect.",
-                ai_enrichment="It equals one minus beta.",
-            )
+            cards = [
+                GeneratedCard(
+                    card_type="normal",
+                    front="What is statistical power?",
+                    back="The probability of detecting a real effect.",
+                    source_excerpt="Power is the probability of detecting a real effect.",
+                    ai_enrichment="It equals one minus beta.",
+                ),
+                GeneratedCard(
+                    card_type="skeleton_recall",
+                    front="Explaining statistical power\n\n1. Definition\n2. Relationship",
+                    back=(
+                        "1. Definition\n- Detecting a real effect\n\n"
+                        "2. Relationship\n- One minus beta"
+                    ),
+                    source_excerpt="Power is the probability of detecting a real effect.",
+                ),
+            ]
         else:
-            card = GeneratedCard(
-                card_type="cloze",
-                cloze_text="Power equals {{c1::one minus beta}}.",
-                source_excerpt="Power equals one minus beta.",
-            )
-        return GenerationResult(cards=[card], request_id=f"request-{chunk.sequence}")
+            cards = [
+                GeneratedCard(
+                    card_type="cloze",
+                    cloze_text="Power equals {{c1::one minus beta}}.",
+                    source_excerpt="Power equals one minus beta.",
+                )
+            ]
+        return GenerationResult(cards=cards, request_id=f"request-{chunk.sequence}")
 
 
 def setup_run(db_session: Session) -> tuple[uuid.UUID, uuid.UUID]:
@@ -91,6 +104,12 @@ def setup_run(db_session: Session) -> tuple[uuid.UUID, uuid.UUID]:
 def test_generated_card_schema_rejects_invalid_content() -> None:
     with pytest.raises(ValueError, match="question and an answer"):
         GeneratedCard(card_type="normal", front="Question", source_excerpt="Source")
+    with pytest.raises(ValueError, match="outline front and a completed back"):
+        GeneratedCard(
+            card_type="skeleton_recall",
+            front="1. Situation",
+            source_excerpt="Source",
+        )
 
 
 def test_process_generation_creates_provenanced_drafts(db_session: Session) -> None:
@@ -102,8 +121,12 @@ def test_process_generation_creates_provenanced_drafts(db_session: Session) -> N
     cards = db_session.scalars(select(Card).order_by(Card.created_at)).all()
     versions = db_session.scalars(select(CardVersion).order_by(CardVersion.created_at)).all()
     assert run.status is GenerationStatus.COMPLETED
-    assert run.generated_cards == 2
-    assert [card.card_type for card in cards] == [CardType.NORMAL, CardType.CLOZE]
+    assert run.generated_cards == 3
+    assert [card.card_type for card in cards] == [
+        CardType.NORMAL,
+        CardType.SKELETON_RECALL,
+        CardType.CLOZE,
+    ]
     assert all(card.user_id == user_id and card.source_chunk_id for card in cards)
     assert versions[0].source_excerpt is not None
     assert versions[0].source_excerpt.startswith("Power")
@@ -210,8 +233,8 @@ def test_generation_skips_exact_duplicate_cards(db_session: Session) -> None:
     run = process_generation_run(db_session, run_id=run_id, generator=FakeGenerator())
     db_session.commit()
 
-    assert run.generated_cards == 1
-    assert db_session.scalar(select(func.count()).select_from(Card)) == 2
+    assert run.generated_cards == 2
+    assert db_session.scalar(select(func.count()).select_from(Card)) == 3
 
 
 def test_generation_skips_unsupported_source_excerpt(db_session: Session) -> None:

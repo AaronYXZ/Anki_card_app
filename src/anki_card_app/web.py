@@ -74,7 +74,7 @@ def current_user_id(session: Session) -> uuid.UUID:
 
 
 def make_card_view(card: Card, version: CardVersion) -> CardView:
-    if card.card_type is CardType.NORMAL:
+    if card.card_type in {CardType.NORMAL, CardType.SKELETON_RECALL}:
         return CardView(
             card=card,
             version=version,
@@ -131,7 +131,7 @@ def parse_card_type(value: str) -> CardType:
     try:
         return CardType(value)
     except ValueError as error:
-        raise CardValidationError("Choose Normal or Cloze.") from error
+        raise CardValidationError("Choose Normal, Cloze, or Skeleton Recall.") from error
 
 
 def raise_http_card_error(error: CardError) -> NoReturn:

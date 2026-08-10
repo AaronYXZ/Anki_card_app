@@ -30,6 +30,7 @@ def test_dashboard_and_empty_workflows(client: TestClient) -> None:
     assert "No drafts waiting" in drafts.text
     assert "Nothing is due" in review.text
     assert "Create a card" in new_card.text
+    assert "Skeleton Recall" in new_card.text
 
 
 def test_normal_card_create_edit_approve_and_review(
@@ -141,6 +142,44 @@ def test_cloze_card_rendering_and_rejection(client: TestClient, db_session: Sess
     assert "No drafts waiting" in client.get("/cards/drafts").text
 
 
+def test_skeleton_recall_card_create_approve_and_review(
+    client: TestClient, db_session: Session
+) -> None:
+    front = "Resolving disagreement\n\n1. Situation\n2. Conflict\n3. Action\n4. Result"
+    back = (
+        "1. Situation\n- Launch decision\n\n"
+        "2. Conflict\n- Evidence was inconclusive\n\n"
+        "3. Action\n- Proposed guarded rollout\n\n"
+        "4. Result\n- Collected stronger evidence"
+    )
+    created = client.post(
+        "/cards/new",
+        data={"card_type": "skeleton_recall", "front": front, "back": back},
+        follow_redirects=False,
+    )
+    assert created.status_code == 303
+    card = db_session.scalar(select(Card).where(Card.card_type == CardType.SKELETON_RECALL))
+    assert card is not None
+
+    inbox = client.get("/cards/drafts")
+    assert "Resolving disagreement" in inbox.text
+    assert "Proposed guarded rollout" in inbox.text
+    approved = client.post(f"/cards/{card.id}/approve", follow_redirects=False)
+    assert approved.status_code == 303
+
+    review = client.get("/review")
+    assert "Resolving disagreement" in review.text
+    assert "Proposed guarded rollout" not in review.text
+    review_session = db_session.scalar(select(ReviewSession))
+    assert review_session is not None
+    client.post(
+        f"/review/{review_session.id}/{card.id}/reveal",
+        follow_redirects=False,
+    )
+    revealed = client.get("/review")
+    assert "Proposed guarded rollout" in revealed.text
+
+
 def test_invalid_card_type_and_missing_card_errors(client: TestClient) -> None:
     invalid_type = client.post(
         "/cards/new",
@@ -152,7 +191,7 @@ def test_invalid_card_type_and_missing_card_errors(client: TestClient) -> None:
     missing_reject = client.post(f"/cards/{missing_id}/reject")
 
     assert invalid_type.status_code == 422
-    assert "Choose Normal or Cloze" in invalid_type.text
+    assert "Choose Normal, Cloze, or Skeleton Recall" in invalid_type.text
     assert missing_edit.status_code == 404
     assert missing_approve.status_code == 404
     assert missing_reject.status_code == 404

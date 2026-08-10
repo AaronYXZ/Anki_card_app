@@ -42,7 +42,7 @@ def create_normal_draft(db_session: Session, user_id: uuid.UUID) -> Card:
     )
 
 
-def test_validate_normal_and_cloze_content() -> None:
+def test_validate_all_card_type_content() -> None:
     normal = validate_content(
         CardType.NORMAL,
         CardContent(front="  Question  ", back="  Answer  ", cloze_text="ignored"),
@@ -51,16 +51,30 @@ def test_validate_normal_and_cloze_content() -> None:
         CardType.CLOZE,
         CardContent(cloze_text="Power is {{c1::one minus beta}}.", back_extra="Context"),
     )
+    skeleton = validate_content(
+        CardType.SKELETON_RECALL,
+        CardContent(
+            front="Debugging an outage\n\n1. Signal\n2. Cause\n3. Fix",
+            back="1. Signal\n- Error spike\n\n2. Cause\n- Bad deploy\n\n3. Fix\n- Rollback",
+        ),
+    )
 
     assert normal.front == "Question"
     assert normal.back == "Answer"
     assert cloze.cloze_text == "Power is {{c1::one minus beta}}."
+    assert skeleton.front is not None
+    assert skeleton.front.startswith("Debugging an outage")
 
 
 @pytest.mark.parametrize(
     ("card_type", "content", "message"),
     [
         (CardType.NORMAL, CardContent(front="Question"), "question and an answer"),
+        (
+            CardType.SKELETON_RECALL,
+            CardContent(front="1. Situation"),
+            "outline front and a completed back",
+        ),
         (CardType.CLOZE, CardContent(), "require cloze text"),
         (CardType.CLOZE, CardContent(cloze_text="No deletion"), "must include a deletion"),
     ],

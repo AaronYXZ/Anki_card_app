@@ -79,6 +79,13 @@ def validate_content(card_type: CardType, content: CardContent) -> CardContent:
             raise CardValidationError("Normal cards require both a question and an answer.")
         return normalized
 
+    if card_type is CardType.SKELETON_RECALL:
+        if normalized.front is None or normalized.back is None:
+            raise CardValidationError(
+                "Skeleton Recall cards require both an outline front and a completed back."
+            )
+        return normalized
+
     if normalized.cloze_text is None:
         raise CardValidationError("Cloze cards require cloze text.")
     if CLOZE_PATTERN.search(normalized.cloze_text) is None:
