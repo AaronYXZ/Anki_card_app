@@ -13,3 +13,8 @@ An AI-assisted spaced-repetition learning system that turns Obsidian notes into 
 ## Status
 
 Initial project setup.
+
+## Product documents
+
+- [Product requirements](docs/PRD.md)
+- [Development plan](docs/DEVELOPMENT_PLAN.md)
