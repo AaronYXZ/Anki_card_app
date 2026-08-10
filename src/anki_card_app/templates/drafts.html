@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Draft inbox · Anki Card App{% endblock %}
+{% block content %}
+  <section class="page-heading">
+    <p class="eyebrow">Quality gate</p>
+    <h1>Draft inbox</h1>
+    <p>Approve only cards you trust. Editing preserves the previous version.</p>
+  </section>
+  {% if cards %}
+    <div class="card-list">
+      {% for item in cards %}
+        <article class="draft-card">
+          <div class="card-meta"><span class="pill">{{ item.card.card_type.value }}</span><span>Version {{ item.version.version_number }}</span></div>
+          <h2>{{ item.prompt }}</h2>
+          <div class="answer-preview">{{ item.answer }}</div>
+          <div class="actions">
+            <form action="/cards/{{ item.card.id }}/approve" method="post"><button class="button primary" type="submit">Approve</button></form>
+            <a class="button" href="/cards/{{ item.card.id }}/edit">Edit</a>
+            <form action="/cards/{{ item.card.id }}/reject" method="post"><button class="button danger" type="submit">Reject</button></form>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state"><h2>No drafts waiting</h2><p>Create a manual card to test the workflow.</p><a class="button primary" href="/cards/new">Create card</a></div>
+  {% endif %}
+{% endblock %}

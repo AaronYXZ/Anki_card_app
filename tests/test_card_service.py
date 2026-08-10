@@ -1,0 +1,170 @@
+import uuid
+from datetime import UTC, datetime
+
+import pytest
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from anki_card_app.card_service import (
+    CardContent,
+    CardNotFoundError,
+    CardValidationError,
+    InvalidCardTransitionError,
+    approve_card,
+    create_draft,
+    edit_card,
+    get_current_version,
+    get_owned_card,
+    reject_card,
+    resume_card,
+    retire_card,
+    suspend_card,
+    validate_content,
+)
+from anki_card_app.models import Card, CardState, CardType, CardVersion, SchedulingState
+from anki_card_app.user_service import ensure_user
+
+
+@pytest.fixture
+def user_id(db_session: Session) -> uuid.UUID:
+    identifier = uuid.uuid4()
+    ensure_user(db_session, user_id=identifier, email=f"{identifier}@example.com")
+    db_session.commit()
+    return identifier
+
+
+def create_normal_draft(db_session: Session, user_id: uuid.UUID) -> Card:
+    return create_draft(
+        db_session,
+        user_id=user_id,
+        card_type=CardType.NORMAL,
+        content=CardContent(front="What is power?", back="One minus Type II error."),
+    )
+
+
+def test_validate_normal_and_cloze_content() -> None:
+    normal = validate_content(
+        CardType.NORMAL,
+        CardContent(front="  Question  ", back="  Answer  ", cloze_text="ignored"),
+    )
+    cloze = validate_content(
+        CardType.CLOZE,
+        CardContent(cloze_text="Power is {{c1::one minus beta}}.", back_extra="Context"),
+    )
+
+    assert normal.front == "Question"
+    assert normal.back == "Answer"
+    assert cloze.cloze_text == "Power is {{c1::one minus beta}}."
+
+
+@pytest.mark.parametrize(
+    ("card_type", "content", "message"),
+    [
+        (CardType.NORMAL, CardContent(front="Question"), "question and an answer"),
+        (CardType.CLOZE, CardContent(), "require cloze text"),
+        (CardType.CLOZE, CardContent(cloze_text="No deletion"), "must include a deletion"),
+    ],
+)
+def test_validate_content_rejects_invalid_cards(
+    card_type: CardType, content: CardContent, message: str
+) -> None:
+    with pytest.raises(CardValidationError, match=message):
+        validate_content(card_type, content)
+
+
+def test_create_and_edit_card_preserves_versions(db_session: Session, user_id: uuid.UUID) -> None:
+    card = create_normal_draft(db_session, user_id)
+    original = get_current_version(db_session, card)
+
+    replacement = edit_card(
+        db_session,
+        user_id=user_id,
+        card_id=card.id,
+        content=CardContent(front="Updated question", back="Updated answer"),
+    )
+    db_session.commit()
+
+    version_count = db_session.scalar(
+        select(func.count()).select_from(CardVersion).where(CardVersion.card_id == card.id)
+    )
+    assert card.state is CardState.DRAFT
+    assert original.version_number == 1
+    assert replacement.version_number == 2
+    assert card.current_version_id == replacement.id
+    assert version_count == 2
+
+
+def test_approve_initializes_due_scheduling_state(db_session: Session, user_id: uuid.UUID) -> None:
+    card = create_normal_draft(db_session, user_id)
+    due_at = datetime(2026, 8, 10, 12, tzinfo=UTC)
+
+    approve_card(db_session, user_id=user_id, card_id=card.id, due_at=due_at)
+    db_session.commit()
+
+    scheduling = db_session.get(SchedulingState, card.id)
+    assert card.state is CardState.ACTIVE
+    assert scheduling is not None
+    assert scheduling.due_at.replace(tzinfo=UTC) == due_at
+    assert scheduling.scheduler_state == "new"
+    assert scheduling.algorithm == "uninitialized"
+
+    with pytest.raises(InvalidCardTransitionError, match="Only draft"):
+        approve_card(db_session, user_id=user_id, card_id=card.id)
+
+
+def test_reject_draft_blocks_editing(db_session: Session, user_id: uuid.UUID) -> None:
+    card = create_normal_draft(db_session, user_id)
+
+    reject_card(db_session, user_id=user_id, card_id=card.id)
+
+    assert card.state is CardState.REJECTED
+    with pytest.raises(InvalidCardTransitionError, match="Cannot edit"):
+        edit_card(
+            db_session,
+            user_id=user_id,
+            card_id=card.id,
+            content=CardContent(front="Question", back="Answer"),
+        )
+    with pytest.raises(InvalidCardTransitionError, match="Only draft"):
+        reject_card(db_session, user_id=user_id, card_id=card.id)
+
+
+def test_suspend_resume_and_retire_lifecycle(db_session: Session, user_id: uuid.UUID) -> None:
+    card = create_normal_draft(db_session, user_id)
+    approve_card(db_session, user_id=user_id, card_id=card.id)
+
+    suspend_card(db_session, user_id=user_id, card_id=card.id)
+    assert card.state.value == "suspended"
+    resume_card(db_session, user_id=user_id, card_id=card.id)
+    assert card.state.value == "active"
+    suspend_card(db_session, user_id=user_id, card_id=card.id)
+    retired_card = retire_card(db_session, user_id=user_id, card_id=card.id)
+    assert retired_card.state is CardState.RETIRED
+
+    with pytest.raises(InvalidCardTransitionError, match="Only active"):
+        suspend_card(db_session, user_id=user_id, card_id=card.id)
+    with pytest.raises(InvalidCardTransitionError, match="Only suspended"):
+        resume_card(db_session, user_id=user_id, card_id=card.id)
+    with pytest.raises(InvalidCardTransitionError, match="Only active or suspended"):
+        retire_card(db_session, user_id=user_id, card_id=card.id)
+
+
+def test_card_access_is_scoped_to_user(db_session: Session, user_id: uuid.UUID) -> None:
+    card = create_normal_draft(db_session, user_id)
+
+    with pytest.raises(CardNotFoundError):
+        get_owned_card(db_session, user_id=uuid.uuid4(), card_id=card.id)
+
+
+def test_current_version_must_exist(db_session: Session, user_id: uuid.UUID) -> None:
+    card = create_normal_draft(db_session, user_id)
+    current_id = card.current_version_id
+    card.current_version_id = None
+
+    with pytest.raises(CardValidationError, match="no current version"):
+        get_current_version(db_session, card)
+
+    card.current_version_id = uuid.uuid4()
+    with pytest.raises(CardValidationError, match="is missing"):
+        get_current_version(db_session, card)
+    card.current_version_id = current_id

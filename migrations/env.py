@@ -5,8 +5,11 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from anki_card_app import models
 from anki_card_app.config import get_settings
 from anki_card_app.database import Base
+
+_ = models
 
 config = context.config
 

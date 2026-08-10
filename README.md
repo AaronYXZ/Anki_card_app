@@ -12,7 +12,7 @@ An AI-assisted spaced-repetition learning system that turns Obsidian notes into 
 
 ## Status
 
-Milestone 0 foundation is complete. The next milestone adds the domain model and manual card workflow.
+Milestone 1 is complete. The application supports manual Normal and Cloze drafts, immutable card versions, approval and rejection, and a due-card review preview.
 
 ## Local development
 
@@ -32,6 +32,14 @@ uv run uvicorn anki_card_app.main:app --reload
 ```
 
 Open [http://localhost:8000/health](http://localhost:8000/health) to verify the application.
+
+The local product workflow is available at [http://localhost:8000](http://localhost:8000):
+
+1. Create a Normal or Cloze draft.
+2. Review, edit, approve, or reject the draft.
+3. Open Review to preview approved due cards and reveal their answers.
+
+The local development build uses a fixed development user. Authentication is added before the private alpha.
 
 Run quality checks:
 

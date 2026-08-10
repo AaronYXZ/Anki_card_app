@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% set editing = mode == "edit" %}
+{% set selected_type = card.card_type.value if editing else form_values.card_type if form_values is defined else "normal" %}
+{% set form_front = version.front if editing else form_values.front if form_values is defined else "" %}
+{% set form_back = version.back if editing else form_values.back if form_values is defined else "" %}
+{% set form_cloze = version.cloze_text if editing else form_values.cloze_text if form_values is defined else "" %}
+{% set form_extra = version.back_extra if editing else form_values.back_extra if form_values is defined else "" %}
+{% block title %}{{ "Edit card" if editing else "New card" }} · Anki Card App{% endblock %}
+{% block content %}
+  <section class="page-heading">
+    <p class="eyebrow">{{ "Versioned editing" if editing else "Manual draft" }}</p>
+    <h1>{{ "Edit card" if editing else "Create a card" }}</h1>
+    <p>{{ "Saving creates a new immutable version." if editing else "The card remains a draft until you approve it." }}</p>
+  </section>
+  {% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
+  <form method="post" class="card-form">
+    {% if not editing %}
+      <fieldset>
+        <legend>Card type</legend>
+        <label><input type="radio" name="card_type" value="normal" {% if selected_type == "normal" %}checked{% endif %}> Normal</label>
+        <label><input type="radio" name="card_type" value="cloze" {% if selected_type == "cloze" %}checked{% endif %}> Cloze</label>
+      </fieldset>
+    {% else %}
+      <p class="pill">{{ selected_type }}</p>
+    {% endif %}
+    <label>Question <textarea name="front" rows="4">{{ form_front or "" }}</textarea></label>
+    <label>Answer <textarea name="back" rows="6">{{ form_back or "" }}</textarea></label>
+    <label>Cloze text <textarea name="cloze_text" rows="5" placeholder="Power equals {{ '{{' }}c1::1 minus Type II error{{ '}}' }}.">{{ form_cloze or "" }}</textarea></label>
+    <label>Back extra <textarea name="back_extra" rows="3">{{ form_extra or "" }}</textarea></label>
+    <div class="actions">
+      <button class="button primary" type="submit">{{ "Save new version" if editing else "Create draft" }}</button>
+      <a class="button" href="/cards/drafts">Cancel</a>
+    </div>
+  </form>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Review · Anki Card App{% endblock %}
+{% block content %}
+  <section class="page-heading">
+    <p class="eyebrow">Active recall preview</p>
+    <h1>Review</h1>
+    <p>Rating and FSRS updates arrive in Milestone 3.</p>
+  </section>
+  {% if card_view %}
+    <article class="review-card">
+      <span class="pill">{{ card_view.card.card_type.value }}</span>
+      <h2>{{ card_view.prompt }}</h2>
+      <details>
+        <summary class="button primary">Show answer</summary>
+        <div class="revealed-answer">{{ card_view.answer }}</div>
+      </details>
+    </article>
+  {% else %}
+    <div class="empty-state"><h2>Nothing is due</h2><p>Approve a draft card to place it in the preview queue.</p><a class="button" href="/cards/drafts">Review drafts</a></div>
+  {% endif %}
+{% endblock %}

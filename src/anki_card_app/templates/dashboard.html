@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · Anki Card App{% endblock %}
+{% block content %}
+  <section class="hero">
+    <p class="eyebrow">Daily learning</p>
+    <h1>{{ due_count }} cards are ready to review</h1>
+    <p>Approve high-quality cards first, then practice active recall on the due queue.</p>
+    <div class="actions">
+      <a class="button primary" href="/review">Start review</a>
+      <a class="button" href="/cards/new">Create a card</a>
+    </div>
+  </section>
+  <section class="metrics" aria-label="Card counts">
+    <article><strong>{{ counts.draft }}</strong><span>Drafts</span></article>
+    <article><strong>{{ counts.active }}</strong><span>Active</span></article>
+    <article><strong>{{ counts.rejected }}</strong><span>Rejected</span></article>
+    <article><strong>{{ counts.suspended }}</strong><span>Suspended</span></article>
+  </section>
+{% endblock %}
