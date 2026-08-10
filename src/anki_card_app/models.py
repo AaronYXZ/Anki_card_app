@@ -39,6 +39,21 @@ class CardState(StrEnum):
     REJECTED = "rejected"
 
 
+class GenerationStatus(StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    PARTIAL = "partial"
+    FAILED = "failed"
+
+
+class ChunkGenerationStatus(StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
 card_type_enum = Enum(
     CardType,
     native_enum=False,
@@ -47,6 +62,18 @@ card_type_enum = Enum(
 )
 card_state_enum = Enum(
     CardState,
+    native_enum=False,
+    values_callable=lambda members: [member.value for member in members],
+    length=16,
+)
+generation_status_enum = Enum(
+    GenerationStatus,
+    native_enum=False,
+    values_callable=lambda members: [member.value for member in members],
+    length=16,
+)
+chunk_generation_status_enum = Enum(
+    ChunkGenerationStatus,
     native_enum=False,
     values_callable=lambda members: [member.value for member in members],
     length=16,
@@ -110,8 +137,38 @@ class SourceChunk(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
+class GenerationRun(Base):
+    __tablename__ = "generation_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user_accounts.id", ondelete="CASCADE"), index=True
+    )
+    source_document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("source_documents.id", ondelete="CASCADE"), index=True
+    )
+    prompt_version: Mapped[str] = mapped_column(String(32))
+    provider: Mapped[str] = mapped_column(String(32))
+    model: Mapped[str] = mapped_column(String(128))
+    input_hash: Mapped[str] = mapped_column(String(64))
+    status: Mapped[GenerationStatus] = mapped_column(
+        generation_status_enum, default=GenerationStatus.PENDING, index=True
+    )
+    total_chunks: Mapped[int] = mapped_column(Integer, default=0)
+    completed_chunks: Mapped[int] = mapped_column(Integer, default=0)
+    generated_cards: Mapped[int] = mapped_column(Integer, default=0)
+    failed_chunks: Mapped[int] = mapped_column(Integer, default=0)
+    error_summary: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class Card(Base):
     __tablename__ = "cards"
+    __table_args__ = (
+        UniqueConstraint("user_id", "content_fingerprint", name="uq_cards_user_fingerprint"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -120,6 +177,13 @@ class Card(Base):
     source_document_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("source_documents.id", ondelete="SET NULL"), index=True
     )
+    source_chunk_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("source_chunks.id", ondelete="SET NULL"), index=True
+    )
+    generation_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("generation_runs.id", ondelete="SET NULL"), index=True
+    )
+    content_fingerprint: Mapped[str | None] = mapped_column(String(64))
     card_type: Mapped[CardType] = mapped_column(card_type_enum)
     state: Mapped[CardState] = mapped_column(card_state_enum, default=CardState.DRAFT, index=True)
     current_version_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -152,8 +216,37 @@ class CardVersion(Base):
     back: Mapped[str | None] = mapped_column(Text)
     cloze_text: Mapped[str | None] = mapped_column(Text)
     back_extra: Mapped[str | None] = mapped_column(Text)
+    source_excerpt: Mapped[str | None] = mapped_column(Text)
+    ai_enrichment: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[str] = mapped_column(String(32), default="user")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class GenerationChunkRun(Base):
+    __tablename__ = "generation_chunk_runs"
+    __table_args__ = (
+        UniqueConstraint(
+            "generation_run_id", "source_chunk_id", name="uq_generation_chunk_runs_chunk"
+        ),
+        CheckConstraint("attempt_count >= 0", name="ck_generation_chunk_attempts_nonnegative"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    generation_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("generation_runs.id", ondelete="CASCADE"), index=True
+    )
+    source_chunk_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("source_chunks.id", ondelete="CASCADE"), index=True
+    )
+    status: Mapped[ChunkGenerationStatus] = mapped_column(
+        chunk_generation_status_enum, default=ChunkGenerationStatus.PENDING, index=True
+    )
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0)
+    generated_count: Mapped[int] = mapped_column(Integer, default=0)
+    request_id: Mapped[str | None] = mapped_column(String(128))
+    error: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class SchedulingState(Base):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 import uuid
 from dataclasses import dataclass
@@ -42,6 +43,19 @@ class CardContent:
     back: str | None = None
     cloze_text: str | None = None
     back_extra: str | None = None
+
+
+def content_fingerprint(card_type: CardType, content: CardContent) -> str:
+    normalized = validate_content(card_type, content)
+    parts = (
+        card_type.value,
+        normalized.front or "",
+        normalized.back or "",
+        normalized.cloze_text or "",
+        normalized.back_extra or "",
+    )
+    canonical = "\x1f".join(" ".join(part.split()).casefold() for part in parts)
+    return hashlib.sha256(canonical.encode()).hexdigest()
 
 
 def clean_optional(value: str | None) -> str | None:
@@ -94,9 +108,30 @@ def create_draft(
     card_type: CardType,
     content: CardContent,
     created_by: str = "user",
+    source_document_id: uuid.UUID | None = None,
+    source_chunk_id: uuid.UUID | None = None,
+    generation_run_id: uuid.UUID | None = None,
+    source_excerpt: str | None = None,
+    ai_enrichment: str | None = None,
 ) -> Card:
     normalized = validate_content(card_type, content)
-    card = Card(user_id=user_id, card_type=card_type, state=CardState.DRAFT)
+    fingerprint = content_fingerprint(card_type, normalized)
+    if session.scalar(
+        select(Card.id).where(
+            Card.user_id == user_id,
+            Card.content_fingerprint == fingerprint,
+        )
+    ):
+        raise CardValidationError("An exact duplicate card already exists.")
+    card = Card(
+        user_id=user_id,
+        card_type=card_type,
+        state=CardState.DRAFT,
+        source_document_id=source_document_id,
+        source_chunk_id=source_chunk_id,
+        generation_run_id=generation_run_id,
+        content_fingerprint=fingerprint,
+    )
     session.add(card)
     session.flush()
 
@@ -107,6 +142,8 @@ def create_draft(
         back=normalized.back,
         cloze_text=normalized.cloze_text,
         back_extra=normalized.back_extra,
+        source_excerpt=clean_optional(source_excerpt),
+        ai_enrichment=clean_optional(ai_enrichment),
         created_by=created_by,
     )
     session.add(version)
@@ -129,6 +166,16 @@ def edit_card(
         raise InvalidCardTransitionError(f"Cannot edit a {card.state.value} card.")
 
     normalized = validate_content(card.card_type, content)
+    current_version = get_current_version(session, card)
+    fingerprint = content_fingerprint(card.card_type, normalized)
+    if session.scalar(
+        select(Card.id).where(
+            Card.user_id == user_id,
+            Card.id != card.id,
+            Card.content_fingerprint == fingerprint,
+        )
+    ):
+        raise CardValidationError("An exact duplicate card already exists.")
     latest_version = session.scalar(
         select(func.max(CardVersion.version_number)).where(CardVersion.card_id == card.id)
     )
@@ -139,11 +186,14 @@ def edit_card(
         back=normalized.back,
         cloze_text=normalized.cloze_text,
         back_extra=normalized.back_extra,
+        source_excerpt=current_version.source_excerpt,
+        ai_enrichment=current_version.ai_enrichment,
         created_by=created_by,
     )
     session.add(version)
     session.flush()
     card.current_version_id = version.id
+    card.content_fingerprint = fingerprint
     card.updated_at = utc_now()
     session.flush()
     return version

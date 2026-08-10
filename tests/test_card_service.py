@@ -94,6 +94,27 @@ def test_create_and_edit_card_preserves_versions(db_session: Session, user_id: u
     assert version_count == 2
 
 
+def test_create_and_edit_reject_exact_duplicates(db_session: Session, user_id: uuid.UUID) -> None:
+    first = create_normal_draft(db_session, user_id)
+    second = create_draft(
+        db_session,
+        user_id=user_id,
+        card_type=CardType.NORMAL,
+        content=CardContent(front="Another question", back="Another answer"),
+    )
+
+    with pytest.raises(CardValidationError, match="duplicate"):
+        create_normal_draft(db_session, user_id)
+    with pytest.raises(CardValidationError, match="duplicate"):
+        edit_card(
+            db_session,
+            user_id=user_id,
+            card_id=second.id,
+            content=CardContent(front="What is power?", back="One minus Type II error."),
+        )
+    assert first.id != second.id
+
+
 def test_approve_initializes_due_scheduling_state(db_session: Session, user_id: uuid.UUID) -> None:
     card = create_normal_draft(db_session, user_id)
     due_at = datetime(2026, 8, 10, 12, tzinfo=UTC)

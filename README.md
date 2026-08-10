@@ -12,7 +12,7 @@ An AI-assisted spaced-repetition learning system that turns Obsidian notes into 
 
 ## Status
 
-Milestone 1 is complete. The application supports manual Normal and Cloze drafts, immutable card versions, approval and rejection, and a due-card review preview.
+Milestone 2's local implementation is complete. In addition to the manual card workflow, the application can safely import UTF-8 Markdown files or ZIP archives, split notes by heading, preserve source provenance, and generate structured Normal and Cloze drafts through OpenAI. Exact duplicate sources and cards are skipped. A live-provider smoke test still requires an `OPENAI_API_KEY`.
 
 ## Local development
 
@@ -38,6 +38,8 @@ The local product workflow is available at [http://localhost:8000](http://localh
 1. Create a Normal or Cloze draft.
 2. Review, edit, approve, or reject the draft.
 3. Open Review to preview approved due cards and reveal their answers.
+
+To generate drafts from notes, set `OPENAI_API_KEY` in `.env`, open `/imports`, and upload a Markdown file or a ZIP of Markdown files. Generation uses `gpt-5.6-terra` by default because card generation is a high-volume workload where balanced quality and cost matter. Override `OPENAI_MODEL` if needed. Without an API key, imports are still validated and stored, and the run shows a clear configuration error.
 
 The local development build uses a fixed development user. Authentication is added before the private alpha.
 

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ document.filename }} · Anki Card App{% endblock %}
+{% block content %}
+  <section class="page-heading">
+    <p class="eyebrow">Generation run</p>
+    <h1>{{ document.filename }}</h1>
+    <p>{{ document.relative_path }} · {{ run.provider }}/{{ run.model }}</p>
+  </section>
+  {% if run.error_summary %}<div class="notice error" role="alert">{{ run.error_summary }}</div>{% endif %}
+  <div class="metrics run-metrics">
+    <article><strong>{{ run.generated_cards }}</strong><span>drafts generated</span></article>
+    <article><strong>{{ run.completed_chunks }}/{{ run.total_chunks }}</strong><span>chunks completed</span></article>
+    <article><strong>{{ run.failed_chunks }}</strong><span>chunks failed</span></article>
+    <article><strong>{{ run.status.value }}</strong><span>run status</span></article>
+  </div>
+  <div class="actions"><a class="button primary" href="/cards/drafts">Review drafts</a><a class="button" href="/imports">All imports</a></div>
+  <section class="chunk-list">
+    <h2>Source chunks</h2>
+    {% for result, chunk in chunks %}
+      <article><div><b>{{ chunk.heading_path or "Untitled section" }}</b><small>Chunk {{ chunk.sequence + 1 }} · {{ result.attempt_count }} attempt{% if result.attempt_count != 1 %}s{% endif %}</small></div><span class="pill status-{{ result.status.value }}">{{ result.status.value }}</span>{% if result.error %}<p class="error-text">{{ result.error }}</p>{% endif %}</article>
+    {% endfor %}
+  </section>
+{% endblock %}

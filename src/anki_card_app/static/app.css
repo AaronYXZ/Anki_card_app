@@ -42,6 +42,8 @@ a { color: inherit; }
 .card-form fieldset label { display: flex; align-items: center; gap: 0.45rem; margin: 0; }
 textarea { width: 100%; resize: vertical; padding: 0.8rem; border: 1px solid var(--line); border-radius: 0.6rem; background: white; color: var(--ink); font: inherit; line-height: 1.5; }
 textarea:focus { outline: 3px solid rgb(36 92 69 / 18%); border-color: var(--accent); }
+.card-form input[type="file"] { width: 100%; padding: 0.8rem; border: 1px dashed var(--line); border-radius: 0.6rem; background: white; }
+.muted, small { color: var(--muted); }
 .notice.error { max-width: 48rem; margin-top: 1rem; padding: 1rem; border-left: 4px solid var(--danger); background: #fff1ef; }
 .card-list { display: grid; gap: 1rem; }
 .draft-card h2, .review-card h2 { white-space: pre-wrap; line-height: 1.35; }
@@ -52,6 +54,17 @@ textarea:focus { outline: 3px solid rgb(36 92 69 / 18%); border-color: var(--acc
 .review-card details summary { width: fit-content; list-style: none; }
 .review-card details summary::-webkit-details-marker { display: none; }
 .revealed-answer { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--line); color: var(--ink); }
+.source-evidence { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--muted); }
+.source-evidence summary { cursor: pointer; font-weight: 700; }
+.source-evidence blockquote { margin-left: 0; padding-left: 1rem; border-left: 3px solid var(--line); white-space: pre-wrap; }
+.import-row, .chunk-list article { display: flex; justify-content: space-between; gap: 1rem; padding: 1.2rem; border: 1px solid var(--line); border-radius: 0.8rem; background: var(--surface); text-decoration: none; }
+.import-row span:first-child, .chunk-list article div { display: grid; gap: 0.35rem; }
+.run-metrics { margin-top: 2rem; }
+.run-metrics strong { overflow-wrap: anywhere; font-size: 1.4rem; }
+.chunk-list { display: grid; gap: 0.75rem; margin-top: 2.5rem; }
+.chunk-list article { flex-wrap: wrap; }
+.chunk-list article .error-text { flex-basis: 100%; margin: 0; color: var(--danger); }
+.status-failed, .status-partial { background: #fff1ef; color: var(--danger); }
 
 @media (max-width: 42rem) {
   .site-header { align-items: flex-start; }

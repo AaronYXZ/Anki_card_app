@@ -29,6 +29,14 @@ class Settings(BaseSettings):
         default="developer@localhost",
         validation_alias="DEVELOPMENT_USER_EMAIL",
     )
+    openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
+    openai_model: str = Field(default="gpt-5.6-terra", validation_alias="OPENAI_MODEL")
+    max_upload_bytes: int = Field(default=10_000_000, validation_alias="MAX_UPLOAD_BYTES")
+    max_archive_files: int = Field(default=250, validation_alias="MAX_ARCHIVE_FILES")
+    max_archive_uncompressed_bytes: int = Field(
+        default=50_000_000,
+        validation_alias="MAX_ARCHIVE_UNCOMPRESSED_BYTES",
+    )
 
 
 @lru_cache

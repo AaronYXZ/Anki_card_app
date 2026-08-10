@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Import notes · Anki Card App{% endblock %}
+{% block content %}
+  <section class="page-heading">
+    <p class="eyebrow">Obsidian intake</p>
+    <h1>Import notes</h1>
+    <p>Upload one UTF-8 Markdown file or a ZIP containing Markdown files. Existing content is detected by hash and will not be imported twice.</p>
+  </section>
+  {% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
+  <form method="post" enctype="multipart/form-data" class="card-form">
+    <label>Markdown or ZIP file <input type="file" name="upload" accept=".md,.zip" required></label>
+    <p class="muted">Folders inside ZIP files are preserved as source paths. Unsafe archive paths are rejected.</p>
+    <div class="actions"><button class="button primary" type="submit">Import and generate drafts</button><a class="button" href="/imports">Cancel</a></div>
+  </form>
+{% endblock %}

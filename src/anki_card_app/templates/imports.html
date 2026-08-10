@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Imports · Anki Card App{% endblock %}
+{% block content %}
+  <section class="page-heading">
+    <p class="eyebrow">Source library</p>
+    <h1>Imports</h1>
+    <p>Track every source, generation result, and partial failure before reviewing the generated drafts.</p>
+    <a class="button primary" href="/imports/new">Import notes</a>
+  </section>
+  {% if runs %}
+    <div class="card-list">
+      {% for run, document in runs %}
+        <a class="import-row" href="/imports/{{ run.id }}"><span><b>{{ document.relative_path }}</b><small>{{ run.model }} · {{ run.total_chunks }} chunks</small></span><span class="pill status-{{ run.status.value }}">{{ run.status.value }}</span></a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state"><h2>No imported notes</h2><p>Start with a Markdown note or an Obsidian folder exported as ZIP.</p><a class="button primary" href="/imports/new">Import notes</a></div>
+  {% endif %}
+{% endblock %}
