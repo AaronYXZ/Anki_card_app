@@ -64,8 +64,17 @@ textarea:focus { outline: 3px solid rgb(36 92 69 / 18%); border-color: var(--acc
 .source-evidence { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--muted); }
 .source-evidence summary { cursor: pointer; font-weight: 700; }
 .source-evidence blockquote { margin-left: 0; padding-left: 1rem; border-left: 3px solid var(--line); white-space: pre-wrap; }
-.import-row, .chunk-list article { display: flex; justify-content: space-between; gap: 1rem; padding: 1.2rem; border: 1px solid var(--line); border-radius: 0.8rem; background: var(--surface); text-decoration: none; }
+.import-row, .note-row, .chunk-list article { display: flex; justify-content: space-between; gap: 1rem; padding: 1.2rem; border: 1px solid var(--line); border-radius: 0.8rem; background: var(--surface); text-decoration: none; }
 .import-row span:first-child, .chunk-list article div { display: grid; gap: 0.35rem; }
+.note-list { display: grid; gap: 1rem; margin-top: 2rem; }
+.note-row { align-items: center; }
+.note-identity, .note-card-summary { display: grid; gap: 0.35rem; }
+.note-card-summary { justify-items: end; min-width: 6rem; }
+.note-card-summary strong { font-size: 1.75rem; }
+.source-metadata { font-size: 0.9rem !important; }
+.ledger-section { margin-top: 3rem; }
+.source-card { padding: 1.4rem; border: 1px solid var(--line); border-radius: 0.8rem; background: var(--surface); }
+.source-card h3 { white-space: pre-wrap; }
 .run-metrics { margin-top: 2rem; }
 .run-metrics strong { overflow-wrap: anywhere; font-size: 1.4rem; }
 .chunk-list { display: grid; gap: 0.75rem; margin-top: 2.5rem; }
@@ -79,4 +88,5 @@ textarea:focus { outline: 3px solid rgb(36 92 69 / 18%); border-color: var(--acc
   .container { padding: 2.5rem 0; }
   .metrics { grid-template-columns: repeat(2, 1fr); margin-top: 2.5rem; }
   .rating-grid { grid-template-columns: repeat(2, 1fr); }
+  .note-row { align-items: flex-start; }
 }

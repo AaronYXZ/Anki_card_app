@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Notes · Anki Card App{% endblock %}
+{% block content %}
+  <section class="page-heading">
+    <p class="eyebrow">Source ledger</p>
+    <h1>Imported notes</h1>
+    <p>See which notes have been imported, how many cards were extracted, and where each card is in its learning lifecycle.</p>
+    <a class="button primary" href="/imports/new">Import notes</a>
+  </section>
+  {% if notes %}
+    <div class="note-list">
+      {% for note in notes %}
+        <a class="note-row" href="/notes/{{ note.document.id }}">
+          <span class="note-identity"><b>{{ note.document.filename }}</b><small>{{ note.document.relative_path }}</small><small>Imported {{ note.document.imported_at.strftime("%Y-%m-%d %H:%M") }} · {{ note.chunk_count }} chunks · {{ note.run_count }} generation run{% if note.run_count != 1 %}s{% endif %}</small></span>
+          <span class="note-card-summary"><strong>{{ note.total_cards }}</strong><small>cards</small>{% if note.latest_run %}<span class="pill status-{{ note.latest_run.status.value }}">{{ note.latest_run.status.value }}</span>{% endif %}</span>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state"><h2>No imported notes</h2><p>Import a Markdown note to start the source ledger.</p><a class="button primary" href="/imports/new">Import notes</a></div>
+  {% endif %}
+{% endblock %}
