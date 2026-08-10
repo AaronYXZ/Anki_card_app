@@ -3,17 +3,17 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, NoReturn
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.responses import Response
 
+from anki_card_app.analytics_service import dashboard_metrics
 from anki_card_app.card_service import (
     CardContent,
     CardError,
@@ -34,7 +34,6 @@ from anki_card_app.models import (
     CardType,
     CardVersion,
     ReviewSession,
-    SchedulingState,
 )
 from anki_card_app.review_service import (
     ReviewError,
@@ -144,32 +143,11 @@ def raise_http_card_error(error: CardError) -> NoReturn:
 @router.get("/", response_class=HTMLResponse)
 def dashboard(request: Request, session: SessionDependency) -> HTMLResponse:
     user_id = current_user_id(session)
-    counts = {
-        state.value: session.scalar(
-            select(func.count())
-            .select_from(Card)
-            .where(Card.user_id == user_id, Card.state == state)
-        )
-        or 0
-        for state in CardState
-    }
-    due_count = (
-        session.scalar(
-            select(func.count())
-            .select_from(Card)
-            .join(SchedulingState, SchedulingState.card_id == Card.id)
-            .where(
-                Card.user_id == user_id,
-                Card.state == CardState.ACTIVE,
-                SchedulingState.due_at <= datetime.now(UTC),
-            )
-        )
-        or 0
-    )
+    metrics = dashboard_metrics(session, user_id=user_id)
     return templates.TemplateResponse(
         request=request,
         name="dashboard.html",
-        context={"counts": counts, "due_count": due_count},
+        context={"metrics": metrics},
     )
 
 

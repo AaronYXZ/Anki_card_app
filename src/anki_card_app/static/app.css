@@ -35,6 +35,10 @@ a { color: inherit; }
 .metrics strong, .metrics span { display: block; }
 .metrics strong { font-size: 2rem; }
 .metrics span { margin-top: 0.3rem; color: var(--muted); }
+.dashboard-section { margin-top: 3rem; }
+.dashboard-section h2 { margin-bottom: 0; }
+.dashboard-metrics { margin-top: 1rem; }
+.metric-note { max-width: 48rem; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
 .card-form, .draft-card, .review-card, .empty-state { margin-top: 2rem; padding: clamp(1.25rem, 4vw, 2.25rem); border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); box-shadow: 0 0.6rem 2rem rgb(44 48 42 / 5%); }
 .draft-card { scroll-margin-top: 1rem; }
 .card-form { max-width: 48rem; }
