@@ -1,3 +1,4 @@
+import re
 import uuid
 
 from fastapi.testclient import TestClient
@@ -10,6 +11,7 @@ from anki_card_app.models import (
     CardState,
     CardType,
     CardVersion,
+    ReviewSession,
     SchedulingState,
     UserAccount,
 )
@@ -83,7 +85,31 @@ def test_normal_card_create_edit_approve_and_review(
 
     review = client.get("/review")
     assert "Define statistical power." in review.text
-    assert "It equals one minus beta." in review.text
+    assert "It equals one minus beta." not in review.text
+    review_session = db_session.scalar(select(ReviewSession))
+    assert review_session is not None
+
+    revealed = client.post(
+        f"/review/{review_session.id}/{card.id}/reveal",
+        follow_redirects=False,
+    )
+    assert revealed.status_code == 303
+    revealed_page = client.get("/review")
+    assert "It equals one minus beta." in revealed_page.text
+    assert "Again" in revealed_page.text
+    attempt_match = re.search(r'name="attempt_id" value="([^"]+)"', revealed_page.text)
+    assert attempt_match is not None
+
+    rated = client.post(
+        f"/review/{review_session.id}/{card.id}/rate",
+        data={"rating": "3", "attempt_id": attempt_match.group(1)},
+        follow_redirects=False,
+    )
+    assert rated.status_code == 303
+    assert rated.headers["location"] == f"/review/sessions/{review_session.id}"
+    summary = client.get(rated.headers["location"])
+    assert "1 cards reviewed" in summary.text
+    assert "Good" in summary.text
 
 
 def test_cloze_card_rendering_and_rejection(client: TestClient, db_session: Session) -> None:

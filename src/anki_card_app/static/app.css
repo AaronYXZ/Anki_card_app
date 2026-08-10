@@ -54,6 +54,13 @@ textarea:focus { outline: 3px solid rgb(36 92 69 / 18%); border-color: var(--acc
 .review-card details summary { width: fit-content; list-style: none; }
 .review-card details summary::-webkit-details-marker { display: none; }
 .revealed-answer { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--line); color: var(--ink); }
+.rating-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.65rem; margin-top: 2rem; }
+.rating-grid form { margin: 0; }
+.rating { width: 100%; min-height: 4.4rem; padding: 0.65rem; border: 1px solid var(--line); border-radius: 0.7rem; background: white; color: var(--ink); cursor: pointer; }
+.rating b, .rating small { display: block; }
+.rating small { margin-top: 0.25rem; }
+.rating-1 { border-color: #d9958f; }
+.rating-4 { border-color: #83ad91; }
 .source-evidence { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--muted); }
 .source-evidence summary { cursor: pointer; font-weight: 700; }
 .source-evidence blockquote { margin-left: 0; padding-left: 1rem; border-left: 3px solid var(--line); white-space: pre-wrap; }
@@ -71,4 +78,5 @@ textarea:focus { outline: 3px solid rgb(36 92 69 / 18%); border-color: var(--acc
   .site-header nav { flex-direction: column; gap: 0.4rem; }
   .container { padding: 2.5rem 0; }
   .metrics { grid-template-columns: repeat(2, 1fr); margin-top: 2.5rem; }
+  .rating-grid { grid-template-columns: repeat(2, 1fr); }
 }

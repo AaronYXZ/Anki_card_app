@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Session complete · Anki Card App{% endblock %}
+{% block content %}
+  <section class="page-heading">
+    <p class="eyebrow">Session complete</p>
+    <h1>{{ review_session.reviewed_count }} cards reviewed</h1>
+    <p>Every rating has been saved with its prior and updated FSRS state.</p>
+  </section>
+  <div class="metrics rating-summary">
+    <article><strong>{{ counts.get(1, 0) }}</strong><span>Again</span></article>
+    <article><strong>{{ counts.get(2, 0) }}</strong><span>Hard</span></article>
+    <article><strong>{{ counts.get(3, 0) }}</strong><span>Good</span></article>
+    <article><strong>{{ counts.get(4, 0) }}</strong><span>Easy</span></article>
+  </div>
+  <div class="actions"><a class="button primary" href="/review">Check remaining due cards</a><a class="button" href="/">Dashboard</a></div>
+{% endblock %}

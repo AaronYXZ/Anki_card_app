@@ -9,12 +9,13 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from anki_card_app.fsrs_adapter import create_initial_schedule
 from anki_card_app.models import (
     Card,
     CardState,
     CardType,
     CardVersion,
-    SchedulingState,
+    UserAccount,
     utc_now,
 )
 
@@ -222,12 +223,14 @@ def approve_card(
     )
     card.state = CardState.ACTIVE
     card.updated_at = utc_now()
+    user = session.get(UserAccount, user_id)
+    if user is None:
+        raise CardValidationError("Card owner is missing.")
     session.add(
-        SchedulingState(
+        create_initial_schedule(
             card_id=card.id,
             due_at=due_at or utc_now(),
-            scheduler_state="new",
-            algorithm="uninitialized",
+            desired_retention=user.desired_retention,
         )
     )
     session.flush()

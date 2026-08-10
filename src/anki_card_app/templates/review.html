@@ -2,20 +2,30 @@
 {% block title %}Review · Anki Card App{% endblock %}
 {% block content %}
   <section class="page-heading">
-    <p class="eyebrow">Active recall preview</p>
+    <p class="eyebrow">Daily active recall</p>
     <h1>Review</h1>
-    <p>Rating and FSRS updates arrive in Milestone 3.</p>
+    {% if entry %}<p>Card {{ entry.session.reviewed_count + 1 }} of {{ entry.session.queue_size }}. Recall first, then reveal and rate honestly.</p>{% else %}<p>Your due queue is clear for now.</p>{% endif %}
   </section>
-  {% if card_view %}
+  {% if entry and card_view %}
     <article class="review-card">
       <span class="pill">{{ card_view.card.card_type.value }}</span>
       <h2>{{ card_view.prompt }}</h2>
-      <details>
-        <summary class="button primary">Show answer</summary>
+      {% if entry.item.revealed_at %}
         <div class="revealed-answer">{{ card_view.answer }}</div>
-      </details>
+        <div class="rating-grid" aria-label="Recall rating">
+          {% for value, label, meaning in [(1, "Again", "Could not recall"), (2, "Hard", "Serious difficulty"), (3, "Good", "Some hesitation"), (4, "Easy", "Immediate recall")] %}
+            <form action="/review/{{ entry.session.id }}/{{ entry.card.id }}/rate" method="post">
+              <input type="hidden" name="attempt_id" value="{{ attempt_id }}">
+              <input type="hidden" name="rating" value="{{ value }}">
+              <button class="rating rating-{{ value }}" type="submit"><b>{{ label }}</b><small>{{ meaning }}</small></button>
+            </form>
+          {% endfor %}
+        </div>
+      {% else %}
+        <form action="/review/{{ entry.session.id }}/{{ entry.card.id }}/reveal" method="post"><button class="button primary" type="submit">Show answer</button></form>
+      {% endif %}
     </article>
   {% else %}
-    <div class="empty-state"><h2>Nothing is due</h2><p>Approve a draft card to place it in the preview queue.</p><a class="button" href="/cards/drafts">Review drafts</a></div>
+    <div class="empty-state"><h2>Nothing is due</h2><p>Come back when FSRS schedules the next review, or approve another draft.</p><a class="button" href="/cards/drafts">Review drafts</a></div>
   {% endif %}
 {% endblock %}

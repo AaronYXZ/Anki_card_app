@@ -126,8 +126,12 @@ def test_approve_initializes_due_scheduling_state(db_session: Session, user_id: 
     assert card.state is CardState.ACTIVE
     assert scheduling is not None
     assert scheduling.due_at.replace(tzinfo=UTC) == due_at
-    assert scheduling.scheduler_state == "new"
-    assert scheduling.algorithm == "uninitialized"
+    assert scheduling.scheduler_state == "learning"
+    assert scheduling.algorithm == "fsrs"
+    assert scheduling.algorithm_version is not None
+    assert scheduling.fsrs_card is not None
+    assert scheduling.parameters is not None
+    assert scheduling.review_count == 0
 
     with pytest.raises(InvalidCardTransitionError, match="Only draft"):
         approve_card(db_session, user_id=user_id, card_id=card.id)

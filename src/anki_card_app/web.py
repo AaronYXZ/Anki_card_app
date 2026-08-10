@@ -28,7 +28,23 @@ from anki_card_app.card_service import (
 )
 from anki_card_app.config import get_settings
 from anki_card_app.database import get_session
-from anki_card_app.models import Card, CardState, CardType, CardVersion, SchedulingState
+from anki_card_app.models import (
+    Card,
+    CardState,
+    CardType,
+    CardVersion,
+    ReviewSession,
+    SchedulingState,
+)
+from anki_card_app.review_service import (
+    ReviewError,
+    ReviewNotFoundError,
+    get_next_entry,
+    get_or_create_daily_session,
+    reveal_answer,
+    session_rating_counts,
+    submit_review,
+)
 from anki_card_app.user_service import ensure_user
 
 PACKAGE_DIR = Path(__file__).parent
@@ -292,24 +308,109 @@ def reject_card_action(card_id: uuid.UUID, session: SessionDependency) -> Redire
     return RedirectResponse("/cards/drafts", status_code=status.HTTP_303_SEE_OTHER)
 
 
+def raise_http_review_error(error: ReviewError) -> NoReturn:
+    code = (
+        status.HTTP_404_NOT_FOUND
+        if isinstance(error, ReviewNotFoundError)
+        else status.HTTP_409_CONFLICT
+    )
+    raise HTTPException(status_code=code, detail=str(error)) from error
+
+
 @router.get("/review", response_class=HTMLResponse)
-def review_preview(request: Request, session: SessionDependency) -> HTMLResponse:
+def review_page(request: Request, session: SessionDependency) -> HTMLResponse:
     user_id = current_user_id(session)
-    row = session.execute(
-        select(Card, CardVersion)
-        .join(CardVersion, CardVersion.id == Card.current_version_id)
-        .join(SchedulingState, SchedulingState.card_id == Card.id)
-        .where(
-            Card.user_id == user_id,
-            Card.state == CardState.ACTIVE,
-            SchedulingState.due_at <= datetime.now(UTC),
+    review_session = get_or_create_daily_session(session, user_id=user_id)
+    if review_session is None:
+        session.commit()
+        return templates.TemplateResponse(
+            request=request,
+            name="review.html",
+            context={"entry": None, "card_view": None},
         )
-        .order_by(SchedulingState.due_at, Card.created_at)
-        .limit(1)
-    ).one_or_none()
-    card_view = make_card_view(*row) if row is not None else None
+    entry = get_next_entry(
+        session,
+        user_id=user_id,
+        session_id=review_session.id,
+    )
+    if entry is None:
+        session.commit()
+        return templates.TemplateResponse(
+            request=request,
+            name="review.html",
+            context={"entry": None, "card_view": None},
+        )
+    card_view = make_card_view(entry.card, entry.version)
+    attempt_id = uuid.uuid4() if entry.item.revealed_at is not None else None
+    session.commit()
     return templates.TemplateResponse(
         request=request,
         name="review.html",
-        context={"card_view": card_view},
+        context={"entry": entry, "card_view": card_view, "attempt_id": attempt_id},
+    )
+
+
+@router.post("/review/{session_id}/{card_id}/reveal")
+def reveal_review_answer(
+    session_id: uuid.UUID,
+    card_id: uuid.UUID,
+    session: SessionDependency,
+) -> RedirectResponse:
+    user_id = current_user_id(session)
+    try:
+        reveal_answer(
+            session,
+            user_id=user_id,
+            session_id=session_id,
+            card_id=card_id,
+        )
+        session.commit()
+    except ReviewError as error:
+        session.rollback()
+        raise_http_review_error(error)
+    return RedirectResponse("/review", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/review/{session_id}/{card_id}/rate")
+def rate_review_card(
+    session_id: uuid.UUID,
+    card_id: uuid.UUID,
+    rating: Annotated[int, Form()],
+    attempt_id: Annotated[uuid.UUID, Form()],
+    session: SessionDependency,
+) -> RedirectResponse:
+    user_id = current_user_id(session)
+    try:
+        result = submit_review(
+            session,
+            user_id=user_id,
+            session_id=session_id,
+            card_id=card_id,
+            attempt_id=attempt_id,
+            rating=rating,
+        )
+        session.commit()
+    except ReviewError as error:
+        session.rollback()
+        raise_http_review_error(error)
+    destination = f"/review/sessions/{session_id}" if result.session_completed else "/review"
+    return RedirectResponse(destination, status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/review/sessions/{session_id}", response_class=HTMLResponse)
+def review_session_summary(
+    request: Request,
+    session_id: uuid.UUID,
+    session: SessionDependency,
+) -> HTMLResponse:
+    user_id = current_user_id(session)
+    try:
+        counts = session_rating_counts(session, user_id=user_id, session_id=session_id)
+    except ReviewError as error:
+        raise_http_review_error(error)
+    review_session = session.get(ReviewSession, session_id)
+    return templates.TemplateResponse(
+        request=request,
+        name="review_summary.html",
+        context={"review_session": review_session, "counts": counts},
     )

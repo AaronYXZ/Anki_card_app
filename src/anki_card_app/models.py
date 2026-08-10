@@ -251,6 +251,9 @@ class GenerationChunkRun(Base):
 
 class SchedulingState(Base):
     __tablename__ = "scheduling_states"
+    __table_args__ = (
+        CheckConstraint("review_count >= 0", name="ck_scheduling_states_review_count_nonnegative"),
+    )
 
     card_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("cards.id", ondelete="CASCADE"), primary_key=True
@@ -263,6 +266,8 @@ class SchedulingState(Base):
     algorithm: Mapped[str] = mapped_column(String(32), default="uninitialized")
     algorithm_version: Mapped[str | None] = mapped_column(String(32))
     parameters: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    fsrs_card: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    review_count: Mapped[int] = mapped_column(Integer, default=0)
     last_review_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
@@ -271,13 +276,41 @@ class SchedulingState(Base):
 
 class ReviewSession(Base):
     __tablename__ = "review_sessions"
+    __table_args__ = (
+        CheckConstraint("queue_size >= 0", name="ck_review_sessions_queue_size_nonnegative"),
+        CheckConstraint(
+            "reviewed_count >= 0 AND reviewed_count <= queue_size",
+            name="ck_review_sessions_reviewed_count_range",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("user_accounts.id", ondelete="CASCADE"), index=True
     )
     queue_size: Mapped[int] = mapped_column(Integer, default=0)
+    reviewed_count: Mapped[int] = mapped_column(Integer, default=0)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ReviewSessionCard(Base):
+    __tablename__ = "review_session_cards"
+    __table_args__ = (
+        UniqueConstraint("review_session_id", "card_id", name="uq_review_session_cards_card"),
+        UniqueConstraint("review_session_id", "position", name="uq_review_session_cards_position"),
+        CheckConstraint("position >= 0", name="ck_review_session_cards_position_nonnegative"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    review_session_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("review_sessions.id", ondelete="CASCADE"), index=True
+    )
+    card_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("cards.id", ondelete="CASCADE"), index=True
+    )
+    position: Mapped[int] = mapped_column(Integer)
+    revealed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
@@ -285,6 +318,10 @@ class ReviewLog(Base):
     __tablename__ = "review_logs"
     __table_args__ = (
         CheckConstraint("rating >= 1 AND rating <= 4", name="ck_review_logs_rating_range"),
+        CheckConstraint(
+            "response_time_ms IS NULL OR response_time_ms >= 0",
+            name="ck_review_logs_response_time_nonnegative",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -300,6 +337,8 @@ class ReviewLog(Base):
     )
     rating: Mapped[int] = mapped_column(Integer)
     reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    response_time_ms: Mapped[int | None] = mapped_column(Integer)
+    was_new: Mapped[bool] = mapped_column(default=False)
     elapsed_days: Mapped[float | None] = mapped_column(Float)
     prior_state: Mapped[dict[str, Any]] = mapped_column(JSON)
     new_state: Mapped[dict[str, Any]] = mapped_column(JSON)
