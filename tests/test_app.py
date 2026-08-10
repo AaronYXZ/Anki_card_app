@@ -1,5 +1,7 @@
 from fastapi.testclient import TestClient
+from pytest import MonkeyPatch
 
+import anki_card_app.app as app_module
 from anki_card_app.app import create_app
 from anki_card_app.main import app
 
@@ -11,6 +13,18 @@ def test_health_endpoint() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "environment": "development"}
+
+
+def test_readiness_endpoint_reports_database_state(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setattr(app_module, "database_is_ready", lambda: True)
+    ready = TestClient(create_app()).get("/ready")
+    assert ready.status_code == 200
+    assert ready.json() == {"status": "ready"}
+
+    monkeypatch.setattr(app_module, "database_is_ready", lambda: False)
+    unavailable = TestClient(create_app()).get("/ready")
+    assert unavailable.status_code == 503
+    assert unavailable.json() == {"status": "unavailable"}
 
 
 def test_asgi_application_is_configured() -> None:

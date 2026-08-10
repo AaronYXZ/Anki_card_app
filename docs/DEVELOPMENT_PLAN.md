@@ -67,12 +67,12 @@ FastAPI `BackgroundTasks` is acceptable for early local development and small pr
 
 | Milestone | Status | Remaining work |
 |---|---|---|
-| 0. Foundation | Complete locally | Production CI and deployment validation |
+| 0. Foundation | Deployment candidate complete | Live Railway and PostgreSQL acceptance validation |
 | 1. Manual vertical slice | Complete locally | Authorization matrix must remain current as routes are added |
 | 2. Import and generation | Complete locally | Durable queue and formal AI evaluation corpus |
 | 3. FSRS daily review | Complete locally | Production PostgreSQL concurrency exercise |
 | 4. Dashboard and PWA | Core implementation complete | Product-event instrumentation, mobile browser flow, accessibility pass |
-| 5. Private alpha | In progress | Invite acceptance, rate limits, operations, privacy, and deployment |
+| 5. Private alpha | In progress | Live deployment, restoration exercise, invite acceptance, rate limits, and privacy |
 
 The canonical continuation context is [Session Handoff Specification](SESSION_HANDOFF.md).
 
@@ -376,8 +376,8 @@ private-alpha operations slice:
 
 - implement single-use invite acceptance instead of administrator-shared passwords;
 - add login rate limits and security event logging without private content;
-- resolve card deletion semantics so review history cannot be silently cascaded away.
-- document and exercise database backup restoration;
-- prepare Railway deployment configuration and production acceptance checks.
+- resolve card deletion semantics so review history cannot be silently cascaded away;
+- deploy `dev` to Railway and complete Mac/iPhone sync acceptance;
+- enable native database backups and exercise restoration.
 
 Do not add notifications, weekly quizzes, or automatic Obsidian synchronization before the ownership boundary is verified.

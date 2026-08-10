@@ -57,6 +57,13 @@ class Settings(BaseSettings):
             raise ValueError("Production requires AUTH_MODE=password.")
         if self.app_env == "production" and not self.session_cookie_secure:
             raise ValueError("Production requires SESSION_COOKIE_SECURE=true.")
+        lowered_database_url = self.database_url.casefold()
+        if self.app_env == "production" and (
+            lowered_database_url.startswith("sqlite:")
+            or "@localhost" in lowered_database_url
+            or "@127.0.0.1" in lowered_database_url
+        ):
+            raise ValueError("Production requires a non-local PostgreSQL DATABASE_URL.")
         return self
 
 

@@ -4,12 +4,14 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response
 
 from anki_card_app.auth_web import router as auth_router
 from anki_card_app.config import get_settings
+from anki_card_app.database import database_is_ready
+from anki_card_app.exports_web import router as exports_router
 from anki_card_app.imports_web import router as imports_router
 from anki_card_app.notes_web import router as notes_router
 from anki_card_app.security import add_security_headers, prepare_csrf_token, set_csrf_cookie
@@ -42,6 +44,7 @@ def create_app() -> FastAPI:
     application.include_router(web_router)
     application.include_router(imports_router)
     application.include_router(notes_router)
+    application.include_router(exports_router)
 
     @application.get("/manifest.webmanifest", include_in_schema=False)
     def manifest() -> FileResponse:
@@ -64,5 +67,14 @@ def create_app() -> FastAPI:
     @application.get("/health", tags=["system"])
     def health() -> dict[str, str]:
         return {"status": "ok", "environment": settings.app_env}
+
+    @application.get("/ready", tags=["system"], response_model=None)
+    def readiness() -> Response:
+        if database_is_ready():
+            return JSONResponse({"status": "ready"})
+        return JSONResponse(
+            {"status": "unavailable"},
+            status_code=503,
+        )
 
     return application

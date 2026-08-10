@@ -33,12 +33,14 @@ Implemented capabilities:
 - isolate every existing notes, cards, imports, reviews, and metrics route by request identity;
 - require Session-bound CSRF tokens for every mutation;
 - escape user and model content as text and enforce restrictive browser security headers;
+- deploy with Railway config-as-code, migration gating, and database readiness checks;
+- export all owned learning data as a portable JSON backup;
 - use `Space` to reveal an answer and `1` through `4` to rate it.
 
 This is not yet private-alpha ready. Authentication, authorization, CSRF, CSP,
 and text-rendering boundaries are implemented, but invite acceptance, password
-recovery, login rate limits, durable background jobs, production deployment,
-backups, and full mobile or accessibility acceptance testing remain open.
+recovery, login rate limits, durable background jobs, live production deployment,
+database restoration, and full mobile or accessibility acceptance testing remain open.
 
 ## Technology
 
@@ -104,6 +106,8 @@ Open these local pages:
 - Daily review: [http://localhost:8000/review](http://localhost:8000/review)
 - PWA installation: [http://localhost:8000/install](http://localhost:8000/install)
 - Health check: [http://localhost:8000/health](http://localhost:8000/health)
+- Database readiness: [http://localhost:8000/ready](http://localhost:8000/ready)
+- Portable JSON export: [http://localhost:8000/exports/backup.json](http://localhost:8000/exports/backup.json)
 
 ## Use the product
 
@@ -131,6 +135,12 @@ The rating mapping is standard FSRS: Again `1`, Hard `2`, Good `3`, Easy `4`. Re
 ### Install the PWA
 
 Open `/install` for platform-specific instructions. The application shell and static assets are cached. Imports, approvals, ratings, and all other data writes require a connection to the server. Offline review writes are intentionally unsupported.
+
+### Deploy and synchronize devices
+
+See [Railway Deployment and Sync Acceptance](docs/RAILWAY_DEPLOYMENT.md). The
+shared PostgreSQL database is the V1 synchronization source. Mac and iPhone do
+not synchronize directly with each other.
 
 ## Configuration
 
@@ -164,8 +174,8 @@ uv run pytest --cov=anki_card_app --cov-report=term-missing
 
 Current verified working-tree baseline:
 
-- 82 tests passing;
-- 95.65 percent total coverage;
+- 88 tests passing;
+- 95.78 percent total coverage;
 - Ruff, Mypy, JavaScript syntax, manifest parsing, and live PWA endpoint checks passing.
 
 ## Important constraints
@@ -184,5 +194,6 @@ Current verified working-tree baseline:
 - [Development plan](docs/DEVELOPMENT_PLAN.md)
 - [Session handoff specification](docs/SESSION_HANDOFF.md)
 - [Authentication decision and threat model](docs/AUTHENTICATION.md)
+- [Railway deployment and sync acceptance](docs/RAILWAY_DEPLOYMENT.md)
 
 The handoff specification is the canonical starting point for the next development session. It records the current architecture, invariants, known gaps, validation state, and recommended next task.

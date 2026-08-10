@@ -6,13 +6,13 @@
 |---|---|
 | Project | Anki Card App |
 | Snapshot date | 2026-08-10 |
-| Branch | `main` |
-| Last completed commit | `490b806 Document MVP status and session handoff` |
+| Branch | `dev` |
+| Last completed commit | `705bd25 Add cloud authentication and security foundation` |
 | Local URL | `http://127.0.0.1:8000` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
-| Test baseline | 82 passing, 95.65 percent coverage |
-| Product stage | Local MVP core loop and authentication hardening slices complete |
+| Test baseline | 88 passing, 95.78 percent coverage |
+| Product stage | Cloud deployment candidate implemented locally, live Railway acceptance pending |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -96,6 +96,9 @@ Important modules:
 | `src/anki_card_app/auth_service.py` | Password credentials and server-side session lifecycle |
 | `src/anki_card_app/auth_web.py` | Login and logout routes |
 | `src/anki_card_app/security.py` | Session-bound CSRF, CSP, and browser security headers |
+| `src/anki_card_app/export_service.py` | User-owned portable JSON backup construction |
+| `src/anki_card_app/exports_web.py` | Authenticated backup download route |
+| `src/anki_card_app/database.py` | Engine configuration, Railway URL normalization, readiness check |
 | `src/anki_card_app/web.py` | Dashboard, manual cards, draft lifecycle, review pages |
 | `src/anki_card_app/imports_web.py` | Upload flow, model choice, generation background tasks and retries |
 | `src/anki_card_app/notes_web.py` | Imported-note ledger and note-to-card traceability |
@@ -161,10 +164,12 @@ rejected unless `AUTH_MODE=password` and `SESSION_COOKIE_SECURE=true`. See
 | `/review/{session_id}/{card_id}/reveal` | POST | Record answer reveal |
 | `/review/{session_id}/{card_id}/rate` | POST | Persist rating and FSRS transition |
 | `/review/sessions/{session_id}` | GET | Completed-session summary |
+| `/exports/backup.json` | GET | Download all owned learning data without credentials or sessions |
 | `/install` | GET | PWA installation and keyboard guidance |
 | `/manifest.webmanifest` | GET | Root-scoped PWA manifest |
 | `/service-worker.js` | GET | Root-scoped static-shell service worker |
 | `/health` | GET | Process health response |
+| `/ready` | GET | PostgreSQL readiness response used by Railway deployment gating |
 
 There is no public JSON product API yet. The current product surface is server-rendered HTML.
 
@@ -277,8 +282,8 @@ node --check src/anki_card_app/static/service-worker.js
 
 At the handoff snapshot:
 
-- 71 tests pass;
-- total branch-aware coverage is 95.65 percent;
+- 88 tests pass;
+- total branch-aware coverage is 95.78 percent;
 - coverage threshold is 90 percent;
 - both PWA icons are valid PNG files at 192 by 192 and 512 by 512;
 - live manifest response type is `application/manifest+json`;
@@ -294,7 +299,8 @@ Tests use an isolated SQLite database through fixtures. Production-like PostgreS
 - No single-use invite acceptance, password recovery, or account deletion lifecycle.
 - The initial authorization matrix is implemented, but it must remain current as routes are added.
 - No durable job queue. In-process generation can be interrupted.
-- No production deployment, TLS, managed secrets, backups, or restoration exercise.
+- Railway config-as-code, migration gating, readiness, and export are implemented.
+  Live deployment, native backup enablement, and restoration exercise remain open.
 - Content is safely rendered as escaped text with a restrictive CSP. A future
   Markdown-to-HTML renderer would still require an allowlist sanitizer.
 - No rate, token, or cost budget per import.
@@ -334,15 +340,15 @@ Recommended order:
 1. Implement single-use invite acceptance and administrative account lifecycle.
 2. Add login and import rate limits plus observable generation cost.
 3. Add source and card deletion with tested review-history behavior.
-4. Add database backup and restoration documentation, then exercise it.
-5. Prepare Railway deployment configuration and production acceptance checks.
+4. Deploy the `dev` branch to Railway and complete the Mac/iPhone sync acceptance runbook.
+5. Enable native PostgreSQL backups and exercise restoration into a temporary service.
 6. Move generation to a durable worker queue before multi-instance deployment.
 7. Run Playwright flows at mobile and desktop sizes.
 8. Perform an accessibility pass for focus, labels, contrast, and keyboard behavior.
 
-The next-session deliverable should be single-use invite acceptance or the
-backup-and-deployment operations slice. Preserve the authorization and CSRF
-matrices as routes are added.
+The next-session deliverable should be the live Railway deployment and sync
+acceptance run, or single-use invite acceptance if external deployment is not
+authorized. Preserve the authorization, CSRF, and export ownership matrices.
 
 ## 14. Definition of a safe handoff continuation
 
