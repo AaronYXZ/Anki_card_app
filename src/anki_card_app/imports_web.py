@@ -9,6 +9,7 @@ from fastapi import (
     BackgroundTasks,
     Depends,
     File,
+    Form,
     HTTPException,
     Request,
     UploadFile,
@@ -46,6 +47,19 @@ from anki_card_app.web import current_user_id, templates
 
 router = APIRouter(prefix="/imports", tags=["imports"])
 SessionDependency = Annotated[Session, Depends(get_session)]
+GENERATION_MODEL_OPTIONS = (
+    ("gpt-5.6-terra", "Terra"),
+    ("gpt-5.6-luna", "Luna"),
+)
+ALLOWED_GENERATION_MODELS = frozenset(model for model, _ in GENERATION_MODEL_OPTIONS)
+
+
+def _import_form_context(*, selected_model: str, error: str | None = None) -> dict[str, object]:
+    return {
+        "error": error,
+        "model_options": GENERATION_MODEL_OPTIONS,
+        "selected_model": selected_model,
+    }
 
 
 def _process_in_background(
@@ -96,10 +110,16 @@ def import_list(request: Request, session: SessionDependency) -> HTMLResponse:
 
 @router.get("/new", response_class=HTMLResponse)
 def import_form(request: Request) -> HTMLResponse:
+    settings = get_settings()
+    selected_model = (
+        settings.openai_model
+        if settings.openai_model in ALLOWED_GENERATION_MODELS
+        else GENERATION_MODEL_OPTIONS[0][0]
+    )
     return templates.TemplateResponse(
         request=request,
         name="import_form.html",
-        context={"error": None},
+        context=_import_form_context(selected_model=selected_model),
     )
 
 
@@ -109,8 +129,20 @@ async def import_action(
     background_tasks: BackgroundTasks,
     session: SessionDependency,
     upload: Annotated[UploadFile, File()],
+    model: Annotated[str, Form()] = "",
 ) -> Response:
     settings = get_settings()
+    selected_model = model.strip() or settings.openai_model
+    if selected_model not in ALLOWED_GENERATION_MODELS:
+        return templates.TemplateResponse(
+            request=request,
+            name="import_form.html",
+            context=_import_form_context(
+                selected_model=GENERATION_MODEL_OPTIONS[0][0],
+                error="Choose Terra or Luna for card generation.",
+            ),
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        )
     user_id = current_user_id(session)
     data = await upload.read(settings.max_upload_bytes + 1)
     limits = ImportLimits(
@@ -129,6 +161,7 @@ async def import_action(
                 .where(
                     GenerationRun.user_id == user_id,
                     GenerationRun.source_document_id == imported.document.id,
+                    GenerationRun.model == selected_model,
                 )
                 .order_by(GenerationRun.created_at.desc())
             )
@@ -141,7 +174,7 @@ async def import_action(
                 user_id=user_id,
                 source_document_id=imported.document.id,
                 provider="openai",
-                model=settings.openai_model,
+                model=selected_model,
                 input_hash=imported.document.content_hash,
             )
             if settings.openai_api_key is None:
@@ -169,7 +202,10 @@ async def import_action(
         return templates.TemplateResponse(
             request=request,
             name="import_form.html",
-            context={"error": str(error)},
+            context=_import_form_context(
+                selected_model=selected_model,
+                error=str(error),
+            ),
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
 
@@ -179,7 +215,7 @@ async def import_action(
                 _process_in_background,
                 run_id,
                 settings.openai_api_key,
-                settings.openai_model,
+                selected_model,
                 settings.openai_timeout_seconds,
                 settings.openai_max_retries,
             )
@@ -235,7 +271,7 @@ def retry_import_generation(
         user_id=user_id,
         source_document_id=document.id,
         provider="openai",
-        model=settings.openai_model,
+        model=original.model,
         input_hash=document.content_hash,
     )
     session.commit()
@@ -243,7 +279,7 @@ def retry_import_generation(
         _process_in_background,
         retry_run.id,
         settings.openai_api_key,
-        settings.openai_model,
+        original.model,
         settings.openai_timeout_seconds,
         settings.openai_max_retries,
     )
