@@ -63,6 +63,19 @@ FastAPI `BackgroundTasks` is acceptable for early local development and small pr
 
 ## 4. Milestones
 
+### Implementation status on 2026-08-10
+
+| Milestone | Status | Remaining work |
+|---|---|---|
+| 0. Foundation | Complete locally | Production CI and deployment validation |
+| 1. Manual vertical slice | Complete locally | Multi-user authorization acceptance tests |
+| 2. Import and generation | Complete locally | Durable queue and formal AI evaluation corpus |
+| 3. FSRS daily review | Complete locally | Production PostgreSQL concurrency exercise |
+| 4. Dashboard and PWA | Core implementation complete | Product-event instrumentation, mobile browser flow, accessibility pass |
+| 5. Private alpha | Not started | Authentication, security, operations, privacy, and deployment |
+
+The canonical continuation context is [Session Handoff Specification](SESSION_HANDOFF.md).
+
 ## Milestone 0. Foundation
 
 Estimated duration: 2 to 3 days.
@@ -357,13 +370,12 @@ A feature is done when:
 
 ## 10. Immediate next action
 
-Start Milestone 0 and stop after the foundation is green. The first development checkpoint should contain:
+Start Milestone 5 with an authentication decision record and threat model. Then build the smallest multi-user authorization slice:
 
-- a runnable FastAPI app;
-- PostgreSQL connectivity;
-- one migration;
-- one health endpoint;
-- one passing unit test;
-- CI commands documented in the README.
+- replace the fixed development identity with request-scoped authenticated identity;
+- create two test users with isolated data;
+- prove that neither user can read or mutate the other's notes, cards, generation runs, review sessions, or metrics;
+- preserve the current local development workflow behind an explicit development-only configuration;
+- document logout, session expiry, invite acceptance, and account deletion behavior before expanding the UI.
 
-Do not add AI generation or PWA features during this checkpoint.
+Do not add notifications, weekly quizzes, or automatic Obsidian synchronization before the ownership boundary is verified.
