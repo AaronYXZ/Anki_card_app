@@ -3,7 +3,14 @@ from __future__ import annotations
 import uuid
 from typing import Literal, Protocol
 
-from openai import OpenAI
+from openai import (
+    AuthenticationError,
+    BadRequestError,
+    NotFoundError,
+    OpenAI,
+    PermissionDeniedError,
+    RateLimitError,
+)
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -38,6 +45,13 @@ Do not invent unsupported claims. Put optional context or pitfalls in ai_enrichm
 in the tested prompt. Quote a short, exact source_excerpt that supports each card. Return
 no more than 20 cards for this chunk.
 """.strip()
+
+
+class GenerationProviderError(RuntimeError):
+    def __init__(self, message: str, *, retryable: bool, abort_run: bool) -> None:
+        super().__init__(message)
+        self.retryable = retryable
+        self.abort_run = abort_run
 
 
 class GeneratedCard(BaseModel):
@@ -85,17 +99,70 @@ class CardGenerator(Protocol):
 class OpenAICardGenerator:
     provider = "openai"
 
-    def __init__(self, *, api_key: str, model: str) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        model: str,
+        timeout_seconds: float = 90.0,
+        max_retries: int = 0,
+    ) -> None:
         self.model = model
-        self._client = OpenAI(api_key=api_key)
+        self._client = OpenAI(
+            api_key=api_key,
+            timeout=timeout_seconds,
+            max_retries=max_retries,
+        )
 
     def generate(self, chunk: SourceChunk) -> GenerationResult:
         heading = chunk.heading_path or "Untitled section"
-        response = self._client.responses.parse(
-            model=self.model,
-            input=f"{CARD_GENERATION_PROMPT}\n\nHeading: {heading}\n\nSOURCE:\n{chunk.text}",
-            text_format=GeneratedCardBatch,
-        )
+        try:
+            response = self._client.responses.parse(
+                model=self.model,
+                input=f"{CARD_GENERATION_PROMPT}\n\nHeading: {heading}\n\nSOURCE:\n{chunk.text}",
+                text_format=GeneratedCardBatch,
+                reasoning={"effort": "low"},
+            )
+        except RateLimitError as exc:
+            error_code = getattr(exc, "code", None)
+            if error_code is None and isinstance(exc.body, dict):
+                error_body = exc.body.get("error", exc.body)
+                if isinstance(error_body, dict):
+                    error_code = error_body.get("code")
+            quota_exhausted = error_code in {
+                "credit_balance_exhausted",
+                "insufficient_quota",
+            }
+            message = (
+                "OpenAI API credits are exhausted. Add credits in OpenAI billing, then resume "
+                "generation."
+                if quota_exhausted
+                else "OpenAI rate limit reached. Try generation again later."
+            )
+            raise GenerationProviderError(
+                message,
+                retryable=not quota_exhausted,
+                abort_run=quota_exhausted,
+            ) from exc
+        except AuthenticationError as exc:
+            raise GenerationProviderError(
+                "OpenAI rejected the API key. Check OPENAI_API_KEY and restart the app.",
+                retryable=False,
+                abort_run=True,
+            ) from exc
+        except (PermissionDeniedError, NotFoundError) as exc:
+            raise GenerationProviderError(
+                f"OpenAI cannot access model {self.model}. Choose an available model and resume.",
+                retryable=False,
+                abort_run=True,
+            ) from exc
+        except BadRequestError as exc:
+            raise GenerationProviderError(
+                "OpenAI rejected the card-generation request. Check the selected model and "
+                "structured-output settings.",
+                retryable=False,
+                abort_run=True,
+            ) from exc
         parsed = response.output_parsed
         if parsed is None:
             raise RuntimeError("The model returned no structured card batch.")
@@ -186,7 +253,9 @@ def process_generation_run(
         raise ValueError("Generation run not found.")
     run.status = GenerationStatus.RUNNING
     run.started_at = run.started_at or utc_now()
-    session.flush()
+    run.completed_at = None
+    session.commit()
+    abort_error: str | None = None
 
     chunk_runs = session.scalars(
         select(GenerationChunkRun)
@@ -201,11 +270,15 @@ def process_generation_run(
         if chunk is None:
             chunk_run.status = ChunkGenerationStatus.FAILED
             chunk_run.error = "Source chunk is missing."
+            chunk_run.completed_at = utc_now()
+            session.commit()
             continue
         chunk_run.status = ChunkGenerationStatus.RUNNING
         chunk_run.started_at = utc_now()
         while chunk_run.attempt_count < max_attempts:
             chunk_run.attempt_count += 1
+            chunk_run.completed_at = None
+            session.commit()
             try:
                 result = generator.generate(chunk)
                 chunk_run.generated_count = _save_candidates(
@@ -214,13 +287,35 @@ def process_generation_run(
                 chunk_run.request_id = result.request_id
                 chunk_run.status = ChunkGenerationStatus.COMPLETED
                 chunk_run.error = None
+                chunk_run.completed_at = utc_now()
+                session.commit()
                 break
             except Exception as exc:
+                session.rollback()
+                recovered_chunk_run = session.get(GenerationChunkRun, chunk_run.id)
+                if recovered_chunk_run is None:
+                    raise RuntimeError("Generation chunk run disappeared.") from exc
+                chunk_run = recovered_chunk_run
                 chunk_run.error = str(exc)[:2_000]
+                chunk_run.completed_at = utc_now()
+                session.commit()
+                if isinstance(exc, GenerationProviderError):
+                    if exc.abort_run:
+                        abort_error = str(exc)
+                    if not exc.retryable:
+                        break
         if chunk_run.status is not ChunkGenerationStatus.COMPLETED:
             chunk_run.status = ChunkGenerationStatus.FAILED
-        chunk_run.completed_at = utc_now()
-        session.flush()
+            chunk_run.completed_at = utc_now()
+            session.commit()
+        if abort_error:
+            for pending_chunk_run in chunk_runs:
+                if pending_chunk_run.status is ChunkGenerationStatus.PENDING:
+                    pending_chunk_run.status = ChunkGenerationStatus.FAILED
+                    pending_chunk_run.error = f"Skipped: {abort_error}"
+                    pending_chunk_run.completed_at = utc_now()
+            session.commit()
+            break
 
     run.completed_chunks = sum(
         item.status is ChunkGenerationStatus.COMPLETED for item in chunk_runs
@@ -233,9 +328,11 @@ def process_generation_run(
         run.error_summary = None
     elif run.completed_chunks:
         run.status = GenerationStatus.PARTIAL
-        run.error_summary = f"{run.failed_chunks} source chunks failed after one retry."
+        run.error_summary = abort_error or (
+            f"{run.failed_chunks} source chunks failed after one retry."
+        )
     else:
         run.status = GenerationStatus.FAILED
-        run.error_summary = "All source chunks failed after one retry."
-    session.flush()
+        run.error_summary = abort_error or "All source chunks failed after one retry."
+    session.commit()
     return run

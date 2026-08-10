@@ -1,13 +1,17 @@
 import uuid
 
+import httpx
 import pytest
+from openai import RateLimitError
 from sqlalchemy import func, select
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from anki_card_app.card_service import CardContent, create_draft
 from anki_card_app.generation import (
     GeneratedCard,
     GeneratedCardBatch,
+    GenerationProviderError,
     GenerationResult,
     OpenAICardGenerator,
     create_generation_run,
@@ -20,6 +24,7 @@ from anki_card_app.models import (
     CardVersion,
     ChunkGenerationStatus,
     GenerationChunkRun,
+    GenerationRun,
     GenerationStatus,
     SourceChunk,
 )
@@ -105,6 +110,35 @@ def test_process_generation_creates_provenanced_drafts(db_session: Session) -> N
     assert versions[0].ai_enrichment == "It equals one minus beta."
 
 
+def test_generation_progress_is_committed_before_provider_call(
+    db_session: Session,
+    test_engine: Engine,
+) -> None:
+    _, run_id = setup_run(db_session)
+    observed: list[tuple[GenerationStatus, ChunkGenerationStatus, int]] = []
+
+    class ObservingGenerator(FakeGenerator):
+        def generate(self, chunk: SourceChunk) -> GenerationResult:
+            with Session(test_engine) as observer:
+                run = observer.get(GenerationRun, run_id)
+                chunk_run = observer.scalar(
+                    select(GenerationChunkRun).where(
+                        GenerationChunkRun.generation_run_id == run_id,
+                        GenerationChunkRun.source_chunk_id == chunk.id,
+                    )
+                )
+                assert run is not None
+                assert chunk_run is not None
+                observed.append((run.status, chunk_run.status, chunk_run.attempt_count))
+            return super().generate(chunk)
+
+    process_generation_run(db_session, run_id=run_id, generator=ObservingGenerator())
+    assert observed == [
+        (GenerationStatus.RUNNING, ChunkGenerationStatus.RUNNING, 1),
+        (GenerationStatus.RUNNING, ChunkGenerationStatus.RUNNING, 1),
+    ]
+
+
 def test_generation_retries_once_and_reports_partial_failure(db_session: Session) -> None:
     _, run_id = setup_run(db_session)
     generator = FakeGenerator(fail_sequences={1})
@@ -134,6 +168,32 @@ def test_generation_reports_total_failure_and_missing_run(db_session: Session) -
     assert "All source chunks" in (run.error_summary or "")
     with pytest.raises(ValueError, match="not found"):
         process_generation_run(db_session, run_id=uuid.uuid4(), generator=FakeGenerator())
+
+
+def test_permanent_provider_error_aborts_remaining_chunks(db_session: Session) -> None:
+    _, run_id = setup_run(db_session)
+
+    class QuotaGenerator(FakeGenerator):
+        def generate(self, chunk: SourceChunk) -> GenerationResult:
+            self.calls[chunk.sequence] = self.calls.get(chunk.sequence, 0) + 1
+            raise GenerationProviderError(
+                "OpenAI API credits are exhausted.",
+                retryable=False,
+                abort_run=True,
+            )
+
+    generator = QuotaGenerator()
+    run = process_generation_run(db_session, run_id=run_id, generator=generator)
+    chunk_runs = db_session.scalars(
+        select(GenerationChunkRun)
+        .join(SourceChunk, SourceChunk.id == GenerationChunkRun.source_chunk_id)
+        .order_by(SourceChunk.sequence)
+    ).all()
+    assert run.status is GenerationStatus.FAILED
+    assert run.error_summary == "OpenAI API credits are exhausted."
+    assert generator.calls == {0: 1}
+    assert [item.attempt_count for item in chunk_runs] == [1, 0]
+    assert all(item.status is ChunkGenerationStatus.FAILED for item in chunk_runs)
 
 
 def test_generation_skips_exact_duplicate_cards(db_session: Session) -> None:
@@ -228,3 +288,26 @@ def test_openai_adapter_rejects_missing_parsed_output() -> None:
     chunk = SourceChunk(source_document_id=uuid.uuid4(), sequence=0, text="Source")
     with pytest.raises(RuntimeError, match="no structured"):
         generator.generate(chunk)
+
+
+def test_openai_adapter_classifies_exhausted_credits() -> None:
+    request = httpx.Request("POST", "https://api.openai.com/v1/responses")
+    response = httpx.Response(429, request=request)
+    quota_error = RateLimitError(
+        "quota",
+        response=response,
+        body={"error": {"code": "credit_balance_exhausted"}},
+    )
+
+    class Responses:
+        def parse(self, **kwargs: object) -> object:
+            raise quota_error
+
+    generator = OpenAICardGenerator.__new__(OpenAICardGenerator)
+    generator.model = "test-model"
+    generator._client = type("Client", (), {"responses": Responses()})()
+    chunk = SourceChunk(source_document_id=uuid.uuid4(), sequence=0, text="Source")
+    with pytest.raises(GenerationProviderError, match="credits") as captured:
+        generator.generate(chunk)
+    assert captured.value.retryable is False
+    assert captured.value.abort_run is True

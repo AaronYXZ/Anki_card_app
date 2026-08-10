@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, timedelta
 from typing import Annotated
 
 from fastapi import (
@@ -47,13 +48,24 @@ router = APIRouter(prefix="/imports", tags=["imports"])
 SessionDependency = Annotated[Session, Depends(get_session)]
 
 
-def _process_in_background(run_id: uuid.UUID, api_key: str, model: str) -> None:
+def _process_in_background(
+    run_id: uuid.UUID,
+    api_key: str,
+    model: str,
+    timeout_seconds: float = 90.0,
+    max_retries: int = 0,
+) -> None:
     with Session(get_engine()) as session:
         try:
             process_generation_run(
                 session,
                 run_id=run_id,
-                generator=OpenAICardGenerator(api_key=api_key, model=model),
+                generator=OpenAICardGenerator(
+                    api_key=api_key,
+                    model=model,
+                    timeout_seconds=timeout_seconds,
+                    max_retries=max_retries,
+                ),
             )
             session.commit()
         except Exception as exc:
@@ -109,6 +121,7 @@ async def import_action(
     try:
         sources = read_upload(upload.filename or "", data, limits)
         run_ids: list[uuid.UUID] = []
+        background_run_ids: list[uuid.UUID] = []
         for source in sources:
             imported = import_markdown(session, user_id=user_id, source=source)
             existing_run = session.scalar(
@@ -120,8 +133,9 @@ async def import_action(
                 .order_by(GenerationRun.created_at.desc())
             )
             if not imported.created and existing_run is not None:
-                run_ids.append(existing_run.id)
-                continue
+                if existing_run.status is GenerationStatus.COMPLETED or not settings.openai_api_key:
+                    run_ids.append(existing_run.id)
+                    continue
             run = create_generation_run(
                 session,
                 user_id=user_id,
@@ -147,6 +161,8 @@ async def import_action(
                     )
                     chunk_run.completed_at = run.completed_at
             run_ids.append(run.id)
+            if settings.openai_api_key:
+                background_run_ids.append(run.id)
         session.commit()
     except ImportValidationError as error:
         session.rollback()
@@ -158,15 +174,83 @@ async def import_action(
         )
 
     if settings.openai_api_key:
-        for run_id in run_ids:
+        for run_id in background_run_ids:
             background_tasks.add_task(
                 _process_in_background,
                 run_id,
                 settings.openai_api_key,
                 settings.openai_model,
+                settings.openai_timeout_seconds,
+                settings.openai_max_retries,
             )
     destination = f"/imports/{run_ids[-1]}" if len(run_ids) == 1 else "/imports"
     return RedirectResponse(destination, status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/{run_id}/retry")
+def retry_import_generation(
+    run_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    session: SessionDependency,
+) -> RedirectResponse:
+    settings = get_settings()
+    user_id = current_user_id(session)
+    original = session.scalar(
+        select(GenerationRun).where(
+            GenerationRun.id == run_id,
+            GenerationRun.user_id == user_id,
+        )
+    )
+    if original is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Import not found.")
+    if original.status is GenerationStatus.COMPLETED:
+        return RedirectResponse(f"/imports/{original.id}", status_code=status.HTTP_303_SEE_OTHER)
+    if original.status is GenerationStatus.RUNNING:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Generation is already running.",
+        )
+    created_at = (
+        original.created_at.replace(tzinfo=UTC)
+        if original.created_at.tzinfo is None
+        else original.created_at
+    )
+    if original.status is GenerationStatus.PENDING and created_at > utc_now() - timedelta(
+        minutes=2
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Generation is still queued. Wait two minutes before resuming.",
+        )
+    if not settings.openai_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="OPENAI_API_KEY is not configured.",
+        )
+    document = session.get(SourceDocument, original.source_document_id)
+    if document is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source not found.")
+    retry_run = create_generation_run(
+        session,
+        user_id=user_id,
+        source_document_id=document.id,
+        provider="openai",
+        model=settings.openai_model,
+        input_hash=document.content_hash,
+    )
+    session.commit()
+    background_tasks.add_task(
+        _process_in_background,
+        retry_run.id,
+        settings.openai_api_key,
+        settings.openai_model,
+        settings.openai_timeout_seconds,
+        settings.openai_max_retries,
+    )
+    return RedirectResponse(
+        f"/imports/{retry_run.id}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
 
 
 @router.get("/{run_id}", response_class=HTMLResponse)

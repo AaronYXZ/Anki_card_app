@@ -42,6 +42,8 @@ The local product workflow is available at [http://localhost:8000](http://localh
 
 To generate drafts from notes, set `OPENAI_API_KEY` in `.env`, open `/imports`, and upload a Markdown file or a ZIP of Markdown files. Generation uses `gpt-5.6-terra` by default because card generation is a high-volume workload where balanced quality and cost matter. Override `OPENAI_MODEL` if needed. Without an API key, imports are still validated and stored, and the run shows a clear configuration error.
 
+Generation progress is committed after every chunk and active run pages refresh every five seconds. Each OpenAI request times out after 90 seconds and is retried once by the generation workflow. Authentication, model-access, and exhausted-credit errors stop the run immediately. After correcting the configuration or adding API credits, use **Resume generation** to create a fresh run without duplicating successful cards.
+
 The local development build uses a fixed development user. Authentication is added before the private alpha.
 
 Run quality checks:

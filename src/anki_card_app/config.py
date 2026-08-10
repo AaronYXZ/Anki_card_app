@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     )
     openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-5.6-terra", validation_alias="OPENAI_MODEL")
+    openai_timeout_seconds: float = Field(
+        default=90.0,
+        validation_alias="OPENAI_TIMEOUT_SECONDS",
+    )
+    openai_max_retries: int = Field(default=0, validation_alias="OPENAI_MAX_RETRIES")
     max_upload_bytes: int = Field(default=10_000_000, validation_alias="MAX_UPLOAD_BYTES")
     max_archive_files: int = Field(default=250, validation_alias="MAX_ARCHIVE_FILES")
     max_archive_uncompressed_bytes: int = Field(

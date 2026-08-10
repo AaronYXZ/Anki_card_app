@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block head_extra %}{% if run.status.value in ["pending", "running"] %}<meta http-equiv="refresh" content="5">{% endif %}{% endblock %}
 {% block title %}{{ document.filename }} · Anki Card App{% endblock %}
 {% block content %}
   <section class="page-heading">
@@ -13,7 +14,11 @@
     <article><strong>{{ run.failed_chunks }}</strong><span>chunks failed</span></article>
     <article><strong>{{ run.status.value }}</strong><span>run status</span></article>
   </div>
-  <div class="actions"><a class="button primary" href="/cards/drafts">Review drafts</a><a class="button" href="/imports">All imports</a></div>
+  <div class="actions">
+    <a class="button primary" href="/cards/drafts">Review drafts</a>
+    <a class="button" href="/imports">All imports</a>
+    {% if run.status.value in ["pending", "partial", "failed"] %}<form action="/imports/{{ run.id }}/retry" method="post"><button class="button" type="submit">Resume generation</button></form>{% endif %}
+  </div>
   <section class="chunk-list">
     <h2>Source chunks</h2>
     {% for result, chunk in chunks %}

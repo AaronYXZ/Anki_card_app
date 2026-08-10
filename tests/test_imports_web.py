@@ -82,13 +82,15 @@ def test_configured_upload_schedules_generation(
         max_archive_uncompressed_bytes=20_000,
         openai_api_key="test-key",
         openai_model="test-model",
+        openai_timeout_seconds=12.0,
+        openai_max_retries=0,
     )
     called: list[uuid.UUID] = []
     monkeypatch.setattr(imports_web, "get_settings", lambda: settings)
     monkeypatch.setattr(
         imports_web,
         "_process_in_background",
-        lambda run_id, api_key, model: called.append(run_id),
+        lambda run_id, api_key, model, timeout_seconds, max_retries: called.append(run_id),
     )
 
     response = client.post(
@@ -136,3 +138,52 @@ def test_background_generation_commits_and_records_outer_failure(
     assert failed is not None
     assert failed.status is GenerationStatus.FAILED
     assert failed.error_summary == "outer failure"
+
+
+def test_retry_creates_a_fresh_run_and_handles_conflicts(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    client.post(
+        "/imports/new",
+        files={"upload": ("retry.md", b"# Topic\nFact", "text/markdown")},
+    )
+    original_run = db_session.scalar(select(GenerationRun))
+    assert original_run is not None
+    original = get_settings()
+    settings = SimpleNamespace(
+        development_user_id=original.development_user_id,
+        development_user_email=original.development_user_email,
+        openai_api_key="test-key",
+        openai_model="test-model",
+        openai_timeout_seconds=12.0,
+        openai_max_retries=0,
+    )
+    called: list[uuid.UUID] = []
+    monkeypatch.setattr(imports_web, "get_settings", lambda: settings)
+    monkeypatch.setattr(
+        imports_web,
+        "_process_in_background",
+        lambda run_id, api_key, model, timeout_seconds, max_retries: called.append(run_id),
+    )
+
+    retried = client.post(f"/imports/{original_run.id}/retry", follow_redirects=False)
+    runs = db_session.scalars(select(GenerationRun).order_by(GenerationRun.created_at)).all()
+    assert retried.status_code == 303
+    assert len(runs) == 2
+    assert retried.headers["location"] == f"/imports/{runs[1].id}"
+    assert called == [runs[1].id]
+
+    runs[1].status = GenerationStatus.RUNNING
+    db_session.commit()
+    running = client.post(f"/imports/{runs[1].id}/retry")
+    assert running.status_code == 409
+    missing = client.post(f"/imports/{uuid.uuid4()}/retry")
+    assert missing.status_code == 404
+
+    original_run.status = GenerationStatus.COMPLETED
+    db_session.commit()
+    completed = client.post(f"/imports/{original_run.id}/retry", follow_redirects=False)
+    assert completed.status_code == 303
+    assert completed.headers["location"] == f"/imports/{original_run.id}"
