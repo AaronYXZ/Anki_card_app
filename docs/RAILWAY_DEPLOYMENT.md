@@ -1,5 +1,16 @@
 # Railway Deployment and Sync Acceptance
 
+## Current production deployment
+
+The production service is available at
+<https://web-production-a42e0.up.railway.app>. The deployment from commit
+`08549cb` passed the Alembic migration gate through `20260810_0006`, the
+`/ready` PostgreSQL check, and Railway's service health check on 2026-08-10.
+
+The first deployment was uploaded with `railway up`. GitHub autodeploy remains
+pending until the Railway GitHub App is granted access to
+`AaronYXZ/Anki_card_app` and the web service source is reconnected to `dev`.
+
 ## Scope
 
 This runbook deploys one FastAPI web replica and one Railway PostgreSQL service.

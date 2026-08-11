@@ -7,12 +7,13 @@
 | Project | Anki Card App |
 | Snapshot date | 2026-08-10 |
 | Branch | `dev` |
-| Last completed commit before live deployment | `7cf130b Prepare Railway deployment and portable backups` |
+| Live deployment source commit | `08549cb Fix Railway Alembic database driver` |
 | Local URL | `http://127.0.0.1:8000` |
+| Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
 | Test baseline | 89 passing, 95.78 percent coverage |
-| Product stage | Railway project provisioned, first deployment fix undergoing verification |
+| Product stage | Railway deployment healthy, first account and device sync acceptance pending |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -299,8 +300,10 @@ Tests use an isolated SQLite database through fixtures. Production-like PostgreS
 - No single-use invite acceptance, password recovery, or account deletion lifecycle.
 - The initial authorization matrix is implemented, but it must remain current as routes are added.
 - No durable job queue. In-process generation can be interrupted.
-- Railway config-as-code, migration gating, readiness, and export are implemented.
-  Live deployment, native backup enablement, and restoration exercise remain open.
+- Railway config-as-code, migration gating, readiness, export, and the first live
+  deployment are complete. Native backup enablement and a restoration exercise remain open.
+- The initial deployment used `railway up`. Railway's GitHub App still needs repository
+  access before `dev` pushes can trigger automatic deployments.
 - Content is safely rendered as escaped text with a restrictive CSP. A future
   Markdown-to-HTML renderer would still require an allowlist sanitizer.
 - No rate, token, or cost budget per import.
@@ -340,15 +343,16 @@ Recommended order:
 1. Implement single-use invite acceptance and administrative account lifecycle.
 2. Add login and import rate limits plus observable generation cost.
 3. Add source and card deletion with tested review-history behavior.
-4. Deploy the `dev` branch to Railway and complete the Mac/iPhone sync acceptance runbook.
-5. Enable native PostgreSQL backups and exercise restoration into a temporary service.
-6. Move generation to a durable worker queue before multi-instance deployment.
-7. Run Playwright flows at mobile and desktop sizes.
-8. Perform an accessibility pass for focus, labels, contrast, and keyboard behavior.
+4. Create the first production account and complete the Mac/iPhone sync acceptance runbook.
+5. Grant Railway's GitHub App access to the repository, then verify a `dev` push triggers deployment.
+6. Enable native PostgreSQL backups and exercise restoration into a temporary service.
+7. Move generation to a durable worker queue before multi-instance deployment.
+8. Run Playwright flows at mobile and desktop sizes.
+9. Perform an accessibility pass for focus, labels, contrast, and keyboard behavior.
 
-The next-session deliverable should be the live Railway deployment and sync
-acceptance run, or single-use invite acceptance if external deployment is not
-authorized. Preserve the authorization, CSRF, and export ownership matrices.
+The next-session deliverable should be the first-account and Mac/iPhone sync
+acceptance run, or single-use invite acceptance if device testing is unavailable.
+Preserve the authorization, CSRF, and export ownership matrices.
 
 ## 14. Definition of a safe handoff continuation
 
