@@ -7,12 +7,12 @@
 | Project | Anki Card App |
 | Snapshot date | 2026-08-10 |
 | Branch | `dev` |
-| Last completed commit | `705bd25 Add cloud authentication and security foundation` |
+| Last completed commit before live deployment | `7cf130b Prepare Railway deployment and portable backups` |
 | Local URL | `http://127.0.0.1:8000` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
-| Test baseline | 88 passing, 95.78 percent coverage |
-| Product stage | Cloud deployment candidate implemented locally, live Railway acceptance pending |
+| Test baseline | 89 passing, 95.78 percent coverage |
+| Product stage | Railway project provisioned, first deployment fix undergoing verification |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -282,7 +282,7 @@ node --check src/anki_card_app/static/service-worker.js
 
 At the handoff snapshot:
 
-- 88 tests pass;
+- 89 tests pass;
 - total branch-aware coverage is 95.78 percent;
 - coverage threshold is 90 percent;
 - both PWA icons are valid PNG files at 192 by 192 and 512 by 512;
