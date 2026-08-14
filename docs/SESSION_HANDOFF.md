@@ -7,13 +7,13 @@
 | Project | Anki Card App |
 | Snapshot date | 2026-08-13 |
 | Branch | `dev` |
-| Live deployment source commit | `08549cb Fix Railway Alembic database driver` |
+| Live deployment source commit | `32e242c Add portable JSON backup restore` |
 | Local URL | `http://127.0.0.1:8000` |
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
 | Test baseline | 99 passing, 93.80 percent coverage |
-| Product stage | JSON restore implemented locally, Railway redeployment and device sync acceptance pending |
+| Product stage | JSON restore deployed, first-account and device sync acceptance pending |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
