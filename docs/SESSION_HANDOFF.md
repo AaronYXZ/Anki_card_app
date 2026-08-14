@@ -12,8 +12,8 @@
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
-| Test baseline | 109 passing, 94.01 percent coverage |
-| Product stage | Approved Cards library and code highlighting deployed, first-account and device sync acceptance pending |
+| Test baseline | 110 passing, 94.03 percent coverage |
+| Product stage | Post-edit card preview ready for deployment, first-account and device sync acceptance pending |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -159,6 +159,7 @@ rejected unless `AUTH_MODE=password` and `SESSION_COOKIE_SECURE=true`. See
 | `/notes/{document_id}` | GET | Source metadata and extracted cards |
 | `/cards/new` | GET, POST | Manual card creation |
 | `/cards` | GET | Browse and edit approved active cards |
+| `/cards/{card_id}` | GET | Review-format card preview without scheduling or history side effects |
 | `/cards/drafts` | GET | Draft review inbox with a floating back-to-top control |
 | `/cards/{card_id}/edit` | GET, POST | Versioned content editing |
 | `/cards/{card_id}/approve` | POST | Activate card and initialize scheduling |

@@ -2,7 +2,7 @@ import re
 import uuid
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from anki_card_app.config import get_settings
@@ -11,6 +11,7 @@ from anki_card_app.models import (
     CardState,
     CardType,
     CardVersion,
+    ReviewLog,
     ReviewSession,
     SchedulingState,
     UserAccount,
@@ -172,7 +173,43 @@ def test_approved_cards_page_lists_active_cards_only(
     assert "Still a draft" not in page.text
     assert "Created " in page.text
     assert "Version 1" in page.text
+    assert f'href="/cards/{approved.id}"' in page.text
     assert f'href="/cards/{approved.id}/edit"' in page.text
+
+
+def test_active_card_edit_redirects_to_review_preview_without_review_side_effects(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    client.post(
+        "/cards/new",
+        data={"card_type": "normal", "front": "Original", "back": "Old answer"},
+    )
+    card = db_session.scalar(select(Card))
+    assert card is not None
+    client.post(f"/cards/{card.id}/approve")
+
+    edited = client.post(
+        f"/cards/{card.id}/edit",
+        data={
+            "front": "Updated **question**",
+            "back": "Updated answer with `code`.",
+        },
+        follow_redirects=False,
+    )
+
+    assert edited.status_code == 303
+    assert edited.headers["location"] == f"/cards/{card.id}"
+    preview = client.get(edited.headers["location"])
+    assert preview.status_code == 200
+    assert "Review preview" in preview.text
+    assert "Modified card" in preview.text
+    assert "Updated <strong>question</strong>" in preview.text
+    assert "Updated answer with <code>code</code>." in preview.text
+    assert "<details open>" in preview.text
+    assert "does not change the card's schedule or review history" in preview.text
+    assert db_session.scalar(select(func.count()).select_from(ReviewSession)) == 0
+    assert db_session.scalar(select(func.count()).select_from(ReviewLog)) == 0
 
 
 def test_manual_markdown_is_preserved_and_rendered_in_draft_and_review(
@@ -279,12 +316,14 @@ def test_invalid_card_type_and_missing_card_errors(client: TestClient) -> None:
     )
     missing_id = uuid.uuid4()
     missing_edit = client.get(f"/cards/{missing_id}/edit")
+    missing_preview = client.get(f"/cards/{missing_id}")
     missing_approve = client.post(f"/cards/{missing_id}/approve")
     missing_reject = client.post(f"/cards/{missing_id}/reject")
 
     assert invalid_type.status_code == 422
     assert "Choose Normal, Cloze, or Skeleton Recall" in invalid_type.text
     assert missing_edit.status_code == 404
+    assert missing_preview.status_code == 404
     assert missing_approve.status_code == 404
     assert missing_reject.status_code == 404
 

@@ -231,6 +231,25 @@ def approved_cards(request: Request, session: SessionDependency) -> HTMLResponse
     )
 
 
+@router.get("/cards/{card_id}", response_class=HTMLResponse)
+def card_preview(
+    request: Request,
+    card_id: uuid.UUID,
+    session: SessionDependency,
+) -> HTMLResponse:
+    user_id = current_user_id(request, session)
+    try:
+        card = get_owned_card(session, user_id=user_id, card_id=card_id)
+        version = get_current_version(session, card)
+    except CardError as error:
+        raise_http_card_error(error)
+    return templates.TemplateResponse(
+        request=request,
+        name="card_preview.html",
+        context={"card_view": make_card_view(card, version)},
+    )
+
+
 @router.get("/cards/{card_id}/edit", response_class=HTMLResponse)
 def edit_card_form(
     request: Request,
@@ -295,7 +314,9 @@ def edit_card_action(
             },
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
-    destination = draft_destination(card.id) if card.state is CardState.DRAFT else "/review"
+    destination = (
+        draft_destination(card.id) if card.state is CardState.DRAFT else f"/cards/{card.id}"
+    )
     return RedirectResponse(destination, status_code=status.HTTP_303_SEE_OTHER)
 
 
