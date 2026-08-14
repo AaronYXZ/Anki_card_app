@@ -7,7 +7,7 @@
 | Project | Anki Card App |
 | Snapshot date | 2026-08-13 |
 | Branch | `dev` |
-| Live deployment source commit | `32e242c Add portable JSON backup restore` |
+| Live deployment source commit | `93b6970 Prevent example-specific flashcards` |
 | Local URL | `http://127.0.0.1:8000` |
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
