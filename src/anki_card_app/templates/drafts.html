@@ -11,7 +11,7 @@
       {% for item in cards %}
         <article class="draft-card" id="card-{{ item.card.id }}">
           <div class="card-meta"><span class="pill">{{ item.card.card_type.value }}</span><span>Version {{ item.version.version_number }}</span></div>
-          <div class="markdown-content card-prompt">{{ item.prompt|markdown }}</div>
+          <div class="markdown-content card-prompt{% if item.card.card_type.value == 'skeleton_recall' %} skeleton-prompt{% endif %}">{{ item.prompt|markdown }}</div>
           <div class="markdown-content answer-preview">{{ item.answer|markdown }}</div>
           {% if item.version.source_excerpt %}
             <details class="source-evidence"><summary>Compare with source</summary><div class="markdown-content source-markdown">{{ item.version.source_excerpt|markdown }}</div>{% if item.version.ai_enrichment %}<div class="markdown-content enrichment"><b>Extra context:</b>{{ item.version.ai_enrichment|markdown }}</div>{% endif %}</details>

@@ -220,6 +220,17 @@ def draft_inbox(request: Request, session: SessionDependency) -> HTMLResponse:
     )
 
 
+@router.get("/cards", response_class=HTMLResponse)
+def approved_cards(request: Request, session: SessionDependency) -> HTMLResponse:
+    user_id = current_user_id(request, session)
+    cards = card_views_for_state(session, user_id=user_id, card_state=CardState.ACTIVE)
+    return templates.TemplateResponse(
+        request=request,
+        name="cards.html",
+        context={"cards": cards},
+    )
+
+
 @router.get("/cards/{card_id}/edit", response_class=HTMLResponse)
 def edit_card_form(
     request: Request,

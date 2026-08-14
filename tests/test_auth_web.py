@@ -168,6 +168,7 @@ def test_two_users_cannot_read_or_mutate_each_others_data(
     dashboard = password_client.get("/")
     assert "0 cards are ready" in dashboard.text
     assert "First user's private question" not in password_client.get("/cards/drafts").text
+    assert "First user's private question" not in password_client.get("/cards").text
     assert "private.md" not in password_client.get("/notes").text
     assert "private.md" not in password_client.get("/imports").text
 

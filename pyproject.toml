@@ -16,6 +16,7 @@ dependencies = [
   "markdown-it-py>=4.0",
   "openai>=1.99",
   "psycopg[binary]>=3.2",
+  "pygments>=2.19",
   "pydantic-settings>=2.10",
   "python-multipart>=0.0.20",
   "sqlalchemy>=2.0",
@@ -32,6 +33,7 @@ dev = [
   "pytest>=8.4",
   "pytest-cov>=6.2",
   "ruff>=0.12",
+  "types-pygments>=2.19",
 ]
 
 [tool.hatch.build.targets.wheel]

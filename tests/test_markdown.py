@@ -13,7 +13,13 @@ def test_markdown_renderer_supports_structure_and_code() -> None:
     assert "<strong>Important</strong>" in rendered
     assert "<code>inline</code>" in rendered
     assert "<ul>" in rendered
-    assert '<code class="language-python">' in rendered
+    assert '<pre class="highlight"><code class="language-python">' in rendered
+    assert '<span class="nb">print</span>' in rendered
+
+    plain_fence = str(render_markdown("```\nplain code\n```"))
+    unknown_fence = str(render_markdown("```not-a-real-language\nplain code\n```"))
+    assert "<pre><code>plain code" in plain_fence
+    assert '<code class="language-not-a-real-language">plain code' in unknown_fence
 
 
 def test_markdown_renderer_escapes_html_and_rejects_unsafe_links() -> None:
@@ -31,3 +37,7 @@ def test_markdown_renderer_escapes_html_and_rejects_unsafe_links() -> None:
     assert "&lt;img src=x" in rendered
     assert "javascript:" in rendered
     assert "href=" not in rendered
+
+    highlighted = str(render_markdown("```python\nprint('<script>')\n```"))
+    assert "<script>" not in highlighted
+    assert "&lt;script&gt;" in highlighted

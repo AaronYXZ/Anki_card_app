@@ -12,8 +12,8 @@
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
-| Test baseline | 108 passing, 93.95 percent coverage |
-| Product stage | Grouped navigation deployed, first-account and device sync acceptance pending |
+| Test baseline | 109 passing, 94.01 percent coverage |
+| Product stage | Approved Cards library and code highlighting ready for deployment, first-account and device sync acceptance pending |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -105,7 +105,7 @@ Important modules:
 | `src/anki_card_app/notes_web.py` | Imported-note ledger and note-to-card traceability |
 | `src/anki_card_app/import_service.py` | Safe upload parsing, ZIP limits, Markdown chunking, content hashing |
 | `src/anki_card_app/generation.py` | Prompt, structured OpenAI output, validation, deduplication, progress persistence |
-| `src/anki_card_app/markdown.py` | CommonMark rendering with embedded HTML disabled |
+| `src/anki_card_app/markdown.py` | CommonMark rendering with embedded HTML disabled and Pygments fenced-code highlighting |
 | `src/anki_card_app/card_service.py` | Card validation, immutable versions, lifecycle transitions |
 | `src/anki_card_app/review_service.py` | Daily queue, reveal rules, idempotent rating transaction |
 | `src/anki_card_app/fsrs_adapter.py` | FSRS state creation, restoration, application, and snapshots |
@@ -158,6 +158,7 @@ rejected unless `AUTH_MODE=password` and `SESSION_COOKIE_SECURE=true`. See
 | `/notes` | GET | Imported-note ledger |
 | `/notes/{document_id}` | GET | Source metadata and extracted cards |
 | `/cards/new` | GET, POST | Manual card creation |
+| `/cards` | GET | Browse and edit approved active cards |
 | `/cards/drafts` | GET | Draft review inbox with a floating back-to-top control |
 | `/cards/{card_id}/edit` | GET, POST | Versioned content editing |
 | `/cards/{card_id}/approve` | POST | Activate card and initialize scheduling |
@@ -209,7 +210,7 @@ Do not violate these invariants:
 12. Password mode never falls back to the fixed development identity.
 13. Raw authentication session tokens are never persisted. Only SHA-256 digests are stored.
 14. Every POST validates a CSRF token derived from the current Session after login.
-15. Ordinary dynamic content is Jinja-autoescaped. Card Markdown is converted by the shared renderer with embedded HTML and unsafe links disabled before templates receive safe markup.
+15. Ordinary dynamic content is Jinja-autoescaped. Card Markdown is converted by the shared renderer with embedded HTML and unsafe links disabled before templates receive safe markup. Recognized fenced-code languages are highlighted by Pygments.
 
 ## 8. Generation behavior
 
