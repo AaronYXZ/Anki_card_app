@@ -12,6 +12,7 @@ from anki_card_app.fsrs_adapter import apply_review, as_utc
 from anki_card_app.models import (
     Card,
     CardState,
+    CardType,
     CardVersion,
     ReviewLog,
     ReviewSession,
@@ -50,6 +51,10 @@ class ReviewSubmission:
     session_completed: bool
 
 
+DAILY_NORMAL_MINIMUM = 10
+DAILY_SKELETON_RECALL_MINIMUM = 3
+
+
 def _owned_session(session: Session, *, user_id: uuid.UUID, session_id: uuid.UUID) -> ReviewSession:
     review_session = session.scalar(
         select(ReviewSession).where(
@@ -71,6 +76,71 @@ def _day_start_utc(now: datetime, timezone_name: str) -> datetime:
     return datetime.combine(local_now.date(), time.min, tzinfo=timezone).astimezone(UTC)
 
 
+def _daily_type_targets(daily_limit: int) -> dict[CardType, int]:
+    normal_target = min(DAILY_NORMAL_MINIMUM, daily_limit)
+    skeleton_target = min(
+        DAILY_SKELETON_RECALL_MINIMUM,
+        max(0, daily_limit - normal_target),
+    )
+    return {
+        CardType.NORMAL: normal_target,
+        CardType.SKELETON_RECALL: skeleton_target,
+    }
+
+
+def _select_due_card_ids(
+    session: Session,
+    *,
+    user_id: uuid.UUID,
+    current_time: datetime,
+    limit: int,
+    card_type: CardType | None = None,
+    excluded_ids: set[uuid.UUID] | None = None,
+) -> list[uuid.UUID]:
+    if limit <= 0:
+        return []
+    excluded = excluded_ids or set()
+    filters = [
+        Card.user_id == user_id,
+        Card.state == CardState.ACTIVE,
+        SchedulingState.due_at <= current_time,
+    ]
+    if card_type is not None:
+        filters.append(Card.card_type == card_type)
+    if excluded:
+        filters.append(Card.id.not_in(excluded))
+
+    reviewed_ids = session.scalars(
+        select(Card.id)
+        .join(SchedulingState, SchedulingState.card_id == Card.id)
+        .where(*filters, SchedulingState.review_count > 0)
+        .order_by(SchedulingState.due_at, Card.created_at, Card.id)
+        .limit(limit)
+    ).all()
+    remaining = limit - len(reviewed_ids)
+    if remaining == 0:
+        return list(reviewed_ids)
+    new_excluded = {*excluded, *reviewed_ids}
+    new_filters = [
+        Card.user_id == user_id,
+        Card.state == CardState.ACTIVE,
+        SchedulingState.due_at <= current_time,
+        SchedulingState.review_count == 0,
+    ]
+    if card_type is not None:
+        new_filters.append(Card.card_type == card_type)
+    if new_excluded:
+        new_filters.append(Card.id.not_in(new_excluded))
+    new_ids = session.scalars(
+        select(Card.id)
+        .join(SchedulingState, SchedulingState.card_id == Card.id)
+        .where(*new_filters)
+        .order_by(SchedulingState.due_at, Card.created_at, Card.id)
+        .limit(remaining)
+    ).all()
+    return [*reviewed_ids, *new_ids]
+
+
 def get_or_create_daily_session(
     session: Session,
     *,
@@ -78,11 +148,16 @@ def get_or_create_daily_session(
     now: datetime | None = None,
 ) -> ReviewSession | None:
     current_time = as_utc(now or utc_now())
+    user = session.get(UserAccount, user_id)
+    if user is None:
+        raise ReviewNotFoundError("User not found.")
+    day_start = _day_start_utc(current_time, user.timezone)
     active_session = session.scalar(
         select(ReviewSession)
         .where(
             ReviewSession.user_id == user_id,
             ReviewSession.completed_at.is_(None),
+            ReviewSession.started_at >= day_start,
         )
         .order_by(ReviewSession.started_at.desc())
         .limit(1)
@@ -90,49 +165,69 @@ def get_or_create_daily_session(
     if active_session is not None:
         return active_session
 
-    user = session.get(UserAccount, user_id)
-    if user is None:
-        raise ReviewNotFoundError("User not found.")
-    reviewed_today = (
-        session.scalar(
-            select(func.count())
-            .select_from(ReviewLog)
+    stale_sessions = session.scalars(
+        select(ReviewSession).where(
+            ReviewSession.user_id == user_id,
+            ReviewSession.completed_at.is_(None),
+            ReviewSession.started_at < day_start,
+        )
+    ).all()
+    for stale_session in stale_sessions:
+        stale_session.completed_at = current_time
+
+    reviewed_today_by_type: dict[CardType, int] = {
+        card_type: count
+        for card_type, count in session.execute(
+            select(Card.card_type, func.count())
+            .join(ReviewLog, ReviewLog.card_id == Card.id)
             .where(
                 ReviewLog.user_id == user_id,
-                ReviewLog.reviewed_at >= _day_start_utc(current_time, user.timezone),
+                ReviewLog.reviewed_at >= day_start,
             )
-        )
-        or 0
-    )
+            .group_by(Card.card_type)
+        ).tuples()
+    }
+    reviewed_today = sum(reviewed_today_by_type.values())
     remaining = max(0, user.daily_limit - reviewed_today)
     if remaining == 0:
         return None
 
-    common_filters = (
-        Card.user_id == user_id,
-        Card.state == CardState.ACTIVE,
-        SchedulingState.due_at <= current_time,
+    selected_ids: list[uuid.UUID] = []
+    selected_set: set[uuid.UUID] = set()
+    for card_type, target in _daily_type_targets(user.daily_limit).items():
+        missing = max(0, target - reviewed_today_by_type.get(card_type, 0))
+        quota_ids = _select_due_card_ids(
+            session,
+            user_id=user_id,
+            current_time=current_time,
+            limit=min(missing, remaining - len(selected_ids)),
+            card_type=card_type,
+            excluded_ids=selected_set,
+        )
+        selected_ids.extend(quota_ids)
+        selected_set.update(quota_ids)
+
+    fill_ids = _select_due_card_ids(
+        session,
+        user_id=user_id,
+        current_time=current_time,
+        limit=remaining - len(selected_ids),
+        excluded_ids=selected_set,
     )
-    reviewed_ids = session.scalars(
-        select(Card.id)
-        .join(SchedulingState, SchedulingState.card_id == Card.id)
-        .where(*common_filters, SchedulingState.review_count > 0)
-        .order_by(SchedulingState.due_at, Card.created_at, Card.id)
-        .limit(remaining)
-    ).all()
-    remaining -= len(reviewed_ids)
-    new_ids = (
+    selected_set.update(fill_ids)
+    card_ids = list(
         session.scalars(
             select(Card.id)
             .join(SchedulingState, SchedulingState.card_id == Card.id)
-            .where(*common_filters, SchedulingState.review_count == 0)
-            .order_by(Card.created_at, Card.id)
-            .limit(remaining)
-        ).all()
-        if remaining
-        else []
+            .where(Card.id.in_(selected_set))
+            .order_by(
+                SchedulingState.review_count == 0,
+                SchedulingState.due_at,
+                Card.created_at,
+                Card.id,
+            )
+        )
     )
-    card_ids = [*reviewed_ids, *new_ids]
     if not card_ids:
         return None
 

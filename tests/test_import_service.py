@@ -103,7 +103,8 @@ def test_chunk_markdown_splits_long_unbroken_text_and_empty() -> None:
 
 def test_import_markdown_is_idempotent_and_persists_chunks(db_session: Session) -> None:
     user = ensure_user(db_session, user_id=uuid.uuid4(), email="import@example.com")
-    source = MarkdownSource("Offers/test.md", "# A\nFact\n## B\nMore")
+    original_markdown = "# A\n**Fact**\n\n- one\n- two\n## B\n`More`"
+    source = MarkdownSource("Offers/test.md", original_markdown)
 
     first = import_markdown(db_session, user_id=user.id, source=source)
     second = import_markdown(db_session, user_id=user.id, source=source)
@@ -113,6 +114,11 @@ def test_import_markdown_is_idempotent_and_persists_chunks(db_session: Session) 
     assert first.created is True
     assert second.created is False
     assert first.document.id == second.document.id
+    assert first.document.raw_content == original_markdown
+    persisted_chunks = db_session.scalars(select(SourceChunk).order_by(SourceChunk.sequence)).all()
+    assert "**Fact**" in persisted_chunks[0].text
+    assert "- one\n- two" in persisted_chunks[0].text
+    assert "`More`" in persisted_chunks[1].text
     assert count == 2
 
 

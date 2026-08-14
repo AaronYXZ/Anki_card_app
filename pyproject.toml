@@ -13,13 +13,18 @@ dependencies = [
   "fastapi>=0.116",
   "fsrs>=6.3.1,<7",
   "jinja2>=3.1",
+  "markdown-it-py>=4.0",
   "openai>=1.99",
   "psycopg[binary]>=3.2",
+  "pygments>=2.19",
   "pydantic-settings>=2.10",
   "python-multipart>=0.0.20",
   "sqlalchemy>=2.0",
   "uvicorn[standard]>=0.35",
 ]
+
+[project.scripts]
+anki-card-admin = "anki_card_app.admin:main"
 
 [dependency-groups]
 dev = [
@@ -28,6 +33,7 @@ dev = [
   "pytest>=8.4",
   "pytest-cov>=6.2",
   "ruff>=0.12",
+  "types-pygments>=2.19",
 ]
 
 [tool.hatch.build.targets.wheel]

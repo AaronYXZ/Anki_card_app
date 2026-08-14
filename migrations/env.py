@@ -7,7 +7,7 @@ from sqlalchemy import engine_from_config, pool
 
 from anki_card_app import models
 from anki_card_app.config import get_settings
-from anki_card_app.database import Base
+from anki_card_app.database import Base, normalize_database_url
 
 _ = models
 
@@ -16,7 +16,10 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+config.set_main_option(
+    "sqlalchemy.url",
+    normalize_database_url(get_settings().database_url),
+)
 target_metadata = Base.metadata
 
 

@@ -63,6 +63,19 @@ FastAPI `BackgroundTasks` is acceptable for early local development and small pr
 
 ## 4. Milestones
 
+### Implementation status on 2026-08-10
+
+| Milestone | Status | Remaining work |
+|---|---|---|
+| 0. Foundation | Deployment candidate complete | Live Railway and PostgreSQL acceptance validation |
+| 1. Manual vertical slice | Complete locally | Authorization matrix must remain current as routes are added |
+| 2. Import and generation | Complete locally | Durable queue and formal AI evaluation corpus |
+| 3. FSRS daily review | Complete locally | Production PostgreSQL concurrency exercise |
+| 4. Dashboard and PWA | Core implementation complete | Product-event instrumentation, mobile browser flow, accessibility pass |
+| 5. Private alpha | In progress | Live deployment, restoration exercise, invite acceptance, rate limits, and privacy |
+
+The canonical continuation context is [Session Handoff Specification](SESSION_HANDOFF.md).
+
 ## Milestone 0. Foundation
 
 Estimated duration: 2 to 3 days.
@@ -357,13 +370,14 @@ A feature is done when:
 
 ## 10. Immediate next action
 
-Start Milestone 0 and stop after the foundation is green. The first development checkpoint should contain:
+The authentication, authorization, Session-bound CSRF, restrictive CSP, and
+escaped text-rendering slices are complete. Continue Milestone 5 with the next
+private-alpha operations slice:
 
-- a runnable FastAPI app;
-- PostgreSQL connectivity;
-- one migration;
-- one health endpoint;
-- one passing unit test;
-- CI commands documented in the README.
+- implement single-use invite acceptance instead of administrator-shared passwords;
+- add login rate limits and security event logging without private content;
+- resolve card deletion semantics so review history cannot be silently cascaded away;
+- deploy `dev` to Railway and complete Mac/iPhone sync acceptance;
+- enable native database backups and exercise restoration.
 
-Do not add AI generation or PWA features during this checkpoint.
+Do not add notifications, weekly quizzes, or automatic Obsidian synchronization before the ownership boundary is verified.

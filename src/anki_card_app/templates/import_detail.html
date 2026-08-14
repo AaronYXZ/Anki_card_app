@@ -17,7 +17,7 @@
   <div class="actions">
     <a class="button primary" href="/cards/drafts">Review drafts</a>
     <a class="button" href="/imports">All imports</a>
-    {% if run.status.value in ["pending", "partial", "failed"] %}<form action="/imports/{{ run.id }}/retry" method="post"><button class="button" type="submit">Resume generation</button></form>{% endif %}
+    {% if run.status.value in ["pending", "partial", "failed"] %}<form action="/imports/{{ run.id }}/retry" method="post"><input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}"><button class="button" type="submit">Resume generation</button></form>{% endif %}
   </div>
   <section class="chunk-list">
     <h2>Source chunks</h2>

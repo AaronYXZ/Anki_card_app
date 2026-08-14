@@ -96,7 +96,7 @@ def _summaries(session: Session, *, user_id: uuid.UUID) -> list[NoteSummary]:
 
 @router.get("", response_class=HTMLResponse)
 def note_list(request: Request, session: SessionDependency) -> HTMLResponse:
-    user_id = current_user_id(session)
+    user_id = current_user_id(request, session)
     return templates.TemplateResponse(
         request=request,
         name="notes.html",
@@ -110,7 +110,7 @@ def note_detail(
     document_id: uuid.UUID,
     session: SessionDependency,
 ) -> HTMLResponse:
-    user_id = current_user_id(session)
+    user_id = current_user_id(request, session)
     document = session.scalar(
         select(SourceDocument).where(
             SourceDocument.id == document_id,

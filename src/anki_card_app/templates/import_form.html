@@ -8,8 +8,15 @@
   </section>
   {% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
   <form method="post" enctype="multipart/form-data" class="card-form">
+    <input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}">
     <label>Markdown or ZIP file <input type="file" name="upload" accept=".md,.zip" required></label>
     <p class="muted">Folders inside ZIP files are preserved as source paths. Unsafe archive paths are rejected.</p>
+    <fieldset class="model-picker">
+      <legend>Card generation model</legend>
+      {% for model_id, label in model_options %}
+        <label><input type="radio" name="model" value="{{ model_id }}"{% if model_id == selected_model %} checked{% endif %}> <span><b>{{ label }}</b><small>{{ model_id }}</small></span></label>
+      {% endfor %}
+    </fieldset>
     <div class="actions"><button class="button primary" type="submit">Import and generate drafts</button><a class="button" href="/imports">Cancel</a></div>
   </form>
 {% endblock %}

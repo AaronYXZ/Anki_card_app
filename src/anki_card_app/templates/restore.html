@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Restore backup · Anki Card App{% endblock %}
+{% block content %}
+  <section class="page-heading">
+    <p class="eyebrow">Portable recovery</p>
+    <h1>Restore backup</h1>
+    <p>Restore cards, drafts, source notes, scheduling state, and complete review history from an exported JSON backup.</p>
+  </section>
+  {% if restored %}
+    <div class="notice success" role="status">
+      Restored {{ restored_cards }} cards, {{ restored_reviews }} review events, and {{ restored_sources }} source documents.
+    </div>
+    <div class="actions"><a class="button primary" href="/">Open dashboard</a><a class="button" href="/cards/drafts">View drafts</a></div>
+  {% else %}
+    {% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" enctype="multipart/form-data" class="card-form">
+      <input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}">
+      <label>Exported JSON backup <input type="file" name="upload" accept=".json,application/json" required></label>
+      <p class="muted">Restore only works on an empty account. IDs are safely remapped to this account. Passwords and login sessions are never imported.</p>
+      <label class="confirmation"><input type="checkbox" name="confirm_restore" value="yes" required> This account is empty and I want to restore the backup.</label>
+      <div class="actions"><button class="button primary" type="submit">Restore backup</button><a class="button" href="/">Cancel</a></div>
+    </form>
+  {% endif %}
+{% endblock %}

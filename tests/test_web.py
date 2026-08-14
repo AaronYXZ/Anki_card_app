@@ -22,12 +22,44 @@ def test_dashboard_and_empty_workflows(client: TestClient) -> None:
     drafts = client.get("/cards/drafts")
     review = client.get("/review")
     new_card = client.get("/cards/new")
+    install = client.get("/install")
 
     assert dashboard.status_code == 200
     assert "0 cards are ready" in dashboard.text
+    assert "30-day first-attempt recall" in dashboard.text
+    assert "N/A" in dashboard.text
     assert "No drafts waiting" in drafts.text
+    assert 'id="top"' in drafts.text
+    assert 'class="back-to-top"' in drafts.text
+    assert 'href="#top"' in drafts.text
     assert "Nothing is due" in review.text
     assert "Create a card" in new_card.text
+    assert "Skeleton Recall" in new_card.text
+    assert install.status_code == 200
+    assert "Add to Home Screen" in install.text
+    assert "Online connection required" in install.text
+    assert "/manifest.webmanifest" in install.text
+    assert "/static/app.js" in install.text
+
+
+def test_primary_navigation_is_grouped_into_four_categories(client: TestClient) -> None:
+    page = client.get("/")
+
+    assert page.text.count('class="nav-group"') == 3
+    assert page.text.count('name="primary-nav-group"') == 3
+    assert "<summary>Create</summary>" in page.text
+    assert '<a href="/imports">Import</a>' in page.text
+    assert '<a href="/cards/new">New card</a>' in page.text
+    assert '<a href="/notes">Imported notes</a>' in page.text
+    assert '<a class="nav-link" href="/review">Review</a>' in page.text
+    assert "<summary>Modify</summary>" in page.text
+    assert '<a href="/cards/drafts">Drafts</a>' in page.text
+    assert '<a href="/cards">Cards</a>' in page.text
+    assert "<summary>Utils</summary>" in page.text
+    assert '<a href="/exports/backup.json">Export</a>' in page.text
+    assert '<a href="/install">Install</a>' in page.text
+    assert '<a href="/restore">Restore</a>' in page.text
+    assert ">Sign out</button>" in page.text
 
 
 def test_normal_card_create_edit_approve_and_review(
@@ -87,6 +119,8 @@ def test_normal_card_create_edit_approve_and_review(
     review = client.get("/review")
     assert "Define statistical power." in review.text
     assert "It equals one minus beta." not in review.text
+    assert 'data-shortcut="Space"' in review.text
+    assert "<kbd>Space</kbd>" in review.text
     review_session = db_session.scalar(select(ReviewSession))
     assert review_session is not None
 
@@ -98,6 +132,8 @@ def test_normal_card_create_edit_approve_and_review(
     revealed_page = client.get("/review")
     assert "It equals one minus beta." in revealed_page.text
     assert "Again" in revealed_page.text
+    assert 'data-shortcut="1"' in revealed_page.text
+    assert 'data-shortcut="4"' in revealed_page.text
     attempt_match = re.search(r'name="attempt_id" value="([^"]+)"', revealed_page.text)
     assert attempt_match is not None
 
@@ -111,6 +147,64 @@ def test_normal_card_create_edit_approve_and_review(
     summary = client.get(rated.headers["location"])
     assert "1 cards reviewed" in summary.text
     assert "Good" in summary.text
+
+
+def test_approved_cards_page_lists_active_cards_only(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    client.post(
+        "/cards/new",
+        data={"card_type": "normal", "front": "Approved question", "back": "Answer"},
+    )
+    approved = db_session.scalar(select(Card).where(Card.state == CardState.DRAFT))
+    assert approved is not None
+    client.post(f"/cards/{approved.id}/approve")
+    client.post(
+        "/cards/new",
+        data={"card_type": "normal", "front": "Still a draft", "back": "Hidden"},
+    )
+
+    page = client.get("/cards")
+
+    assert page.status_code == 200
+    assert "Approved question" in page.text
+    assert "Still a draft" not in page.text
+    assert "Created " in page.text
+    assert "Version 1" in page.text
+    assert f'href="/cards/{approved.id}/edit"' in page.text
+
+
+def test_manual_markdown_is_preserved_and_rendered_in_draft_and_review(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    front = "## Power\n\nWhy is **power** useful with `beta`?"
+    back = "It helps detect:\n\n- **real effects**\n- meaningful differences"
+    created = client.post(
+        "/cards/new",
+        data={"card_type": "normal", "front": front, "back": back},
+        follow_redirects=False,
+    )
+
+    assert created.status_code == 303
+    card = db_session.scalar(select(Card))
+    assert card is not None
+    version = db_session.get(CardVersion, card.current_version_id)
+    assert version is not None
+    assert version.front == front
+    assert version.back == back
+
+    inbox = client.get("/cards/drafts")
+    assert "<h2>Power</h2>" in inbox.text
+    assert "Why is <strong>power</strong> useful with <code>beta</code>?" in inbox.text
+    assert "<ul>" in inbox.text
+    assert "<strong>real effects</strong>" in inbox.text
+
+    client.post(f"/cards/{card.id}/approve", follow_redirects=False)
+    review = client.get("/review")
+    assert "<h2>Power</h2>" in review.text
+    assert "<strong>power</strong>" in review.text
 
 
 def test_cloze_card_rendering_and_rejection(client: TestClient, db_session: Session) -> None:
@@ -139,6 +233,45 @@ def test_cloze_card_rendering_and_rejection(client: TestClient, db_session: Sess
     assert "No drafts waiting" in client.get("/cards/drafts").text
 
 
+def test_skeleton_recall_card_create_approve_and_review(
+    client: TestClient, db_session: Session
+) -> None:
+    front = "Resolving **disagreement**\n\n1. Situation\n2. Conflict\n3. Action\n4. Result"
+    back = (
+        "1. Situation\n- Launch decision\n\n"
+        "2. Conflict\n- Evidence was inconclusive\n\n"
+        "3. Action\n- Proposed guarded rollout\n\n"
+        "4. Result\n- Collected stronger evidence"
+    )
+    created = client.post(
+        "/cards/new",
+        data={"card_type": "skeleton_recall", "front": front, "back": back},
+        follow_redirects=False,
+    )
+    assert created.status_code == 303
+    card = db_session.scalar(select(Card).where(Card.card_type == CardType.SKELETON_RECALL))
+    assert card is not None
+
+    inbox = client.get("/cards/drafts")
+    assert "Resolving <strong>disagreement</strong>" in inbox.text
+    assert "Proposed guarded rollout" in inbox.text
+    assert 'class="markdown-content card-prompt skeleton-prompt"' in inbox.text
+    approved = client.post(f"/cards/{card.id}/approve", follow_redirects=False)
+    assert approved.status_code == 303
+
+    review = client.get("/review")
+    assert "Resolving <strong>disagreement</strong>" in review.text
+    assert "Proposed guarded rollout" not in review.text
+    review_session = db_session.scalar(select(ReviewSession))
+    assert review_session is not None
+    client.post(
+        f"/review/{review_session.id}/{card.id}/reveal",
+        follow_redirects=False,
+    )
+    revealed = client.get("/review")
+    assert "Proposed guarded rollout" in revealed.text
+
+
 def test_invalid_card_type_and_missing_card_errors(client: TestClient) -> None:
     invalid_type = client.post(
         "/cards/new",
@@ -150,7 +283,7 @@ def test_invalid_card_type_and_missing_card_errors(client: TestClient) -> None:
     missing_reject = client.post(f"/cards/{missing_id}/reject")
 
     assert invalid_type.status_code == 422
-    assert "Choose Normal or Cloze" in invalid_type.text
+    assert "Choose Normal, Cloze, or Skeleton Recall" in invalid_type.text
     assert missing_edit.status_code == 404
     assert missing_approve.status_code == 404
     assert missing_reject.status_code == 404

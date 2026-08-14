@@ -61,4 +61,7 @@ def test_app(db_session: Session, monkeypatch: MonkeyPatch) -> FastAPI:
 @pytest.fixture
 def client(test_app: FastAPI) -> Iterator[TestClient]:
     with TestClient(test_app) as test_client:
+        csrf_token = "test_csrf_token_0123456789_ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        test_client.cookies.set("anki_csrf", csrf_token)
+        test_client.headers["X-CSRF-Token"] = csrf_token
         yield test_client

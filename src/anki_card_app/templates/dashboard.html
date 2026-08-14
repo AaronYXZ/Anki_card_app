@@ -3,17 +3,39 @@
 {% block content %}
   <section class="hero">
     <p class="eyebrow">Daily learning</p>
-    <h1>{{ due_count }} cards are ready to review</h1>
+    <h1>{{ metrics.ready_count }} cards are ready to review</h1>
     <p>Approve high-quality cards first, then practice active recall on the due queue.</p>
     <div class="actions">
       <a class="button primary" href="/review">Start review</a>
       <a class="button" href="/cards/new">Create a card</a>
     </div>
   </section>
-  <section class="metrics" aria-label="Card counts">
-    <article><strong>{{ counts.draft }}</strong><span>Drafts</span></article>
-    <article><strong>{{ counts.active }}</strong><span>Active</span></article>
-    <article><strong>{{ counts.rejected }}</strong><span>Rejected</span></article>
-    <article><strong>{{ counts.suspended }}</strong><span>Suspended</span></article>
+  <section class="dashboard-section">
+    <h2>Today</h2>
+    <div class="metrics dashboard-metrics" aria-label="Daily review metrics">
+      <article><strong>{{ metrics.reviewed_today }}/{{ metrics.daily_limit }}</strong><span>Reviews completed</span></article>
+      <article><strong>{{ metrics.due_review_count }}</strong><span>Due reviews</span></article>
+      <article><strong>{{ metrics.overdue_count }}</strong><span>Overdue</span></article>
+      <article><strong>{{ metrics.new_ready_count }}</strong><span>New cards ready</span></article>
+    </div>
+  </section>
+  <section class="dashboard-section">
+    <h2>Learning signal</h2>
+    <div class="metrics dashboard-metrics" aria-label="Learning metrics">
+      <article><strong>{% if metrics.recall_rate_30d is not none %}{{ "%.0f"|format(metrics.recall_rate_30d * 100) }}%{% else %}N/A{% endif %}</strong><span>30-day first-attempt recall</span></article>
+      <article><strong>{{ metrics.recall_successes_30d }}/{{ metrics.recall_attempts_30d }}</strong><span>Successful due recalls</span></article>
+      <article><strong>{{ metrics.completed_sessions_today }}</strong><span>Sessions completed today</span></article>
+      <article><strong>{{ "%.1f"|format(metrics.review_minutes_today) }}</strong><span>Minutes recalling today</span></article>
+    </div>
+    <p class="metric-note">The recall rate counts only the first due-review attempt per card per day. Again is a failure. Hard, Good, and Easy are successful recalls.</p>
+  </section>
+  <section class="dashboard-section">
+    <h2>Card library</h2>
+    <div class="metrics dashboard-metrics" aria-label="Card counts">
+      <article><strong>{{ metrics.card_counts.draft }}</strong><span>Drafts</span></article>
+      <article><strong>{{ metrics.card_counts.active }}</strong><span>Active</span></article>
+      <article><strong>{{ metrics.card_counts.rejected }}</strong><span>Rejected</span></article>
+      <article><strong>{{ metrics.card_counts.suspended }}</strong><span>Suspended</span></article>
+    </div>
   </section>
 {% endblock %}

@@ -29,6 +29,7 @@ def utc_now() -> datetime:
 class CardType(StrEnum):
     NORMAL = "normal"
     CLOZE = "cloze"
+    SKELETON_RECALL = "skeleton_recall"
 
 
 class CardState(StrEnum):
@@ -92,6 +93,8 @@ class UserAccount(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    password_hash: Mapped[str | None] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(default=True)
     timezone: Mapped[str] = mapped_column(String(64), default="UTC")
     daily_limit: Mapped[int] = mapped_column(Integer, default=25)
     desired_retention: Mapped[float] = mapped_column(Float, default=0.9)
@@ -99,6 +102,19 @@ class UserAccount(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
+
+
+class AuthSession(Base):
+    __tablename__ = "auth_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user_accounts.id", ondelete="CASCADE"), index=True
+    )
+    token_digest: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class SourceDocument(Base):
@@ -168,6 +184,10 @@ class Card(Base):
     __tablename__ = "cards"
     __table_args__ = (
         UniqueConstraint("user_id", "content_fingerprint", name="uq_cards_user_fingerprint"),
+        CheckConstraint(
+            "card_type IN ('normal', 'cloze', 'skeleton_recall')",
+            name="ck_cards_card_type",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
