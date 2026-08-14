@@ -1,4 +1,5 @@
 import uuid
+from collections import Counter
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -50,15 +51,31 @@ def make_active_card(
     *,
     question: str,
     due_at: datetime = NOW,
+    card_type: CardType = CardType.NORMAL,
 ) -> Card:
+    content = (
+        CardContent(cloze_text=f"{question} is {{{{c1::remembered}}}}.")
+        if card_type is CardType.CLOZE
+        else CardContent(front=question, back=f"Answer to {question}")
+    )
     card = create_draft(
         db_session,
         user_id=user.id,
-        card_type=CardType.NORMAL,
-        content=CardContent(front=question, back=f"Answer to {question}"),
+        card_type=card_type,
+        content=content,
     )
     approve_card(db_session, user_id=user.id, card_id=card.id, due_at=due_at)
     return card
+
+
+def queued_card_types(db_session: Session, review_session: ReviewSession) -> Counter[CardType]:
+    return Counter(
+        db_session.scalars(
+            select(Card.card_type)
+            .join(ReviewSessionCard, ReviewSessionCard.card_id == Card.id)
+            .where(ReviewSessionCard.review_session_id == review_session.id)
+        ).all()
+    )
 
 
 def test_queue_orders_due_reviews_before_new_and_resumes(db_session: Session) -> None:
@@ -87,6 +104,190 @@ def test_queue_orders_due_reviews_before_new_and_resumes(db_session: Session) ->
     assert [item.card_id for item in items] == [reviewed_card.id, new_card.id]
     assert future_card.id not in {item.card_id for item in items}
     assert get_or_create_daily_session(db_session, user_id=user.id, now=NOW) is review_session
+
+
+def test_queue_reserves_normal_and_skeleton_daily_minimums(db_session: Session) -> None:
+    user = make_user(db_session, daily_limit=15)
+    for number in range(10):
+        make_active_card(db_session, user, question=f"Normal {number}")
+    for number in range(3):
+        make_active_card(
+            db_session,
+            user,
+            question=f"Skeleton {number}",
+            card_type=CardType.SKELETON_RECALL,
+        )
+    reviewed_cloze_ids = []
+    for number in range(5):
+        card = make_active_card(
+            db_session,
+            user,
+            question=f"Cloze {number}",
+            due_at=NOW - timedelta(days=2),
+            card_type=CardType.CLOZE,
+        )
+        reviewed_cloze_ids.append(card.id)
+        state = db_session.get(SchedulingState, card.id)
+        assert state is not None
+        state.review_count = 1
+        state.scheduler_state = "review"
+
+    review_session = get_or_create_daily_session(db_session, user_id=user.id, now=NOW)
+
+    assert review_session is not None
+    assert review_session.queue_size == 15
+    assert queued_card_types(db_session, review_session) == Counter(
+        {
+            CardType.NORMAL: 10,
+            CardType.SKELETON_RECALL: 3,
+            CardType.CLOZE: 2,
+        }
+    )
+    queued_ids = db_session.scalars(
+        select(ReviewSessionCard.card_id)
+        .where(ReviewSessionCard.review_session_id == review_session.id)
+        .order_by(ReviewSessionCard.position)
+    ).all()
+    assert set(queued_ids[:2]).issubset(set(reviewed_cloze_ids))
+
+
+def test_queue_fills_other_types_when_quota_cards_are_unavailable(db_session: Session) -> None:
+    user = make_user(db_session, daily_limit=15)
+    for number in range(4):
+        make_active_card(db_session, user, question=f"Normal {number}")
+    make_active_card(
+        db_session,
+        user,
+        question="Only skeleton",
+        card_type=CardType.SKELETON_RECALL,
+    )
+    for number in range(20):
+        make_active_card(
+            db_session,
+            user,
+            question=f"Cloze {number}",
+            card_type=CardType.CLOZE,
+        )
+
+    review_session = get_or_create_daily_session(db_session, user_id=user.id, now=NOW)
+
+    assert review_session is not None
+    assert queued_card_types(db_session, review_session) == Counter(
+        {
+            CardType.CLOZE: 10,
+            CardType.NORMAL: 4,
+            CardType.SKELETON_RECALL: 1,
+        }
+    )
+
+
+def test_queue_counts_reviews_already_completed_toward_type_minimums(
+    db_session: Session,
+) -> None:
+    user = make_user(db_session, daily_limit=13)
+    completed_cards = [
+        *(
+            make_active_card(
+                db_session,
+                user,
+                question=f"Completed normal {number}",
+                due_at=NOW + timedelta(days=1),
+            )
+            for number in range(8)
+        ),
+        *(
+            make_active_card(
+                db_session,
+                user,
+                question=f"Completed skeleton {number}",
+                due_at=NOW + timedelta(days=1),
+                card_type=CardType.SKELETON_RECALL,
+            )
+            for number in range(2)
+        ),
+    ]
+    db_session.add_all(
+        ReviewLog(
+            attempt_id=uuid.uuid4(),
+            user_id=user.id,
+            card_id=card.id,
+            rating=3,
+            reviewed_at=NOW,
+            was_new=False,
+            prior_state={},
+            new_state={},
+        )
+        for card in completed_cards
+    )
+    for number in range(10):
+        make_active_card(db_session, user, question=f"Due normal {number}")
+    for number in range(3):
+        make_active_card(
+            db_session,
+            user,
+            question=f"Due skeleton {number}",
+            card_type=CardType.SKELETON_RECALL,
+        )
+    for number in range(5):
+        make_active_card(
+            db_session,
+            user,
+            question=f"Due cloze {number}",
+            card_type=CardType.CLOZE,
+        )
+
+    review_session = get_or_create_daily_session(db_session, user_id=user.id, now=NOW)
+
+    assert review_session is not None
+    assert review_session.queue_size == 3
+    assert queued_card_types(db_session, review_session) == Counter(
+        {CardType.NORMAL: 2, CardType.SKELETON_RECALL: 1}
+    )
+
+
+def test_queue_closes_stale_session_and_rebuilds_daily_type_minimums(
+    db_session: Session,
+) -> None:
+    user = make_user(db_session, daily_limit=13)
+    stale_card = make_active_card(
+        db_session,
+        user,
+        question="Stale cloze",
+        card_type=CardType.CLOZE,
+    )
+    stale_session = ReviewSession(
+        user_id=user.id,
+        queue_size=1,
+        reviewed_count=0,
+        started_at=NOW - timedelta(days=1),
+    )
+    db_session.add(stale_session)
+    db_session.flush()
+    db_session.add(
+        ReviewSessionCard(
+            review_session_id=stale_session.id,
+            card_id=stale_card.id,
+            position=0,
+        )
+    )
+    for number in range(10):
+        make_active_card(db_session, user, question=f"Fresh normal {number}")
+    for number in range(3):
+        make_active_card(
+            db_session,
+            user,
+            question=f"Fresh skeleton {number}",
+            card_type=CardType.SKELETON_RECALL,
+        )
+
+    review_session = get_or_create_daily_session(db_session, user_id=user.id, now=NOW)
+
+    assert review_session is not None
+    assert review_session.id != stale_session.id
+    assert stale_session.completed_at == NOW
+    assert queued_card_types(db_session, review_session) == Counter(
+        {CardType.NORMAL: 10, CardType.SKELETON_RECALL: 3}
+    )
 
 
 def test_reveal_submit_and_idempotent_retry(db_session: Session) -> None:

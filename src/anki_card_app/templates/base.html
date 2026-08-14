@@ -14,7 +14,7 @@
     <script src="{{ url_for('static', path='/app.js') }}" defer></script>
     {% block head_extra %}{% endblock %}
   </head>
-  <body>
+  <body id="top">
     <header class="site-header">
       <a class="brand" href="/">Anki Card App</a>
       {% if request.scope.get("auth_user") %}

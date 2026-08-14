@@ -29,6 +29,9 @@ def test_dashboard_and_empty_workflows(client: TestClient) -> None:
     assert "30-day first-attempt recall" in dashboard.text
     assert "N/A" in dashboard.text
     assert "No drafts waiting" in drafts.text
+    assert 'id="top"' in drafts.text
+    assert 'class="back-to-top"' in drafts.text
+    assert 'href="#top"' in drafts.text
     assert "Nothing is due" in review.text
     assert "Create a card" in new_card.text
     assert "Skeleton Recall" in new_card.text

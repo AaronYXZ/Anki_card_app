@@ -5,15 +5,15 @@
 | Field | Value |
 |---|---|
 | Project | Anki Card App |
-| Snapshot date | 2026-08-13 |
+| Snapshot date | 2026-08-14 |
 | Branch | `dev` |
 | Live deployment source commit | `93b6970 Prevent example-specific flashcards` |
 | Local URL | `http://127.0.0.1:8000` |
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
-| Test baseline | 100 passing, 93.80 percent coverage |
-| Product stage | JSON restore deployed, first-account and device sync acceptance pending |
+| Test baseline | 104 passing, 93.93 percent coverage |
+| Product stage | Daily type quotas ready for deployment, first-account and device sync acceptance pending |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -157,7 +157,7 @@ rejected unless `AUTH_MODE=password` and `SESSION_COOKIE_SECURE=true`. See
 | `/notes` | GET | Imported-note ledger |
 | `/notes/{document_id}` | GET | Source metadata and extracted cards |
 | `/cards/new` | GET, POST | Manual card creation |
-| `/cards/drafts` | GET | Draft review inbox |
+| `/cards/drafts` | GET | Draft review inbox with a floating back-to-top control |
 | `/cards/{card_id}/edit` | GET, POST | Versioned content editing |
 | `/cards/{card_id}/approve` | POST | Activate card and initialize scheduling |
 | `/cards/{card_id}/reject` | POST | Exclude draft from learning |
@@ -245,13 +245,18 @@ Generation uses FastAPI `BackgroundTasks`. This is acceptable for local MVP use 
 
 ## 9. Review and metrics behavior
 
-The default user has a daily capacity stored on `UserAccount`. Queue selection does the following:
+The default user has a daily capacity stored on `UserAccount`. The queue targets
+at least 10 Normal and 3 Skeleton Recall reviews per local day when the daily
+limit is at least 13 and enough due cards of each type exist. A lower limit is
+always respected. Missing quota cards are never fabricated, and unused capacity
+is filled with other due card types. Queue selection does the following:
 
-1. Reuse an unfinished session if one exists.
+1. Reuse an unfinished session from the same local day. Close stale sessions and rebuild the queue after the local day changes.
 2. Subtract reviews already completed during the user's local day.
-3. Select due previously reviewed cards ordered by due time.
-4. Fill remaining capacity with new active cards ordered by creation time.
-5. Store the fixed session order in `review_session_cards`.
+3. Reserve the missing Normal and Skeleton Recall targets.
+4. Fill unused capacity with any other due cards.
+5. Order previously reviewed cards before new cards, then order by due time.
+6. Store the fixed session order in `review_session_cards`.
 
 Rating mapping:
 

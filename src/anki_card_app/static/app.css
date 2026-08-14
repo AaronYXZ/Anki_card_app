@@ -102,6 +102,9 @@ textarea:focus, input[type="email"]:focus, input[type="password"]:focus { outlin
 .install-card { padding: 1.4rem; border: 1px solid var(--line); border-radius: 0.9rem; background: var(--surface); }
 .install-card h2 { margin-top: 0; }
 .install-card li { margin-top: 0.65rem; line-height: 1.45; }
+.back-to-top { position: fixed; right: calc(1rem + env(safe-area-inset-right)); bottom: calc(1rem + env(safe-area-inset-bottom)); z-index: 10; display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0.65rem 0.9rem; border-radius: 999px; background: var(--accent); color: white; font-weight: 800; text-decoration: none; box-shadow: 0 0.5rem 1.5rem rgb(22 44 35 / 24%); }
+.back-to-top:hover, .back-to-top:focus-visible { background: var(--accent-strong); }
+.back-to-top:focus-visible { outline: 3px solid rgb(36 92 69 / 24%); outline-offset: 3px; }
 
 @media (max-width: 42rem) {
   .site-header { align-items: flex-start; }
