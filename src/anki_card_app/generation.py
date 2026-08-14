@@ -33,7 +33,7 @@ from anki_card_app.models import (
     utc_now,
 )
 
-PROMPT_VERSION = "anki-v2-skeleton"
+PROMPT_VERSION = "anki-v3-example-boundary"
 CARD_GENERATION_PROMPT = """
 You create durable interview-preparation flashcards for machine learning engineers.
 Extract the source's key concepts, facts, decisions, equations, code behavior, and
@@ -56,6 +56,16 @@ outline in front. Do not reveal supporting details in front. Put the same sectio
 and fill each with compact bullets that preserve logical or chronological order, causal
 reasoning, evidence, and examples. Include only enough detail to trigger reconstruction.
 Never write a long essay. One skeleton_recall card covers one complete framework or story.
+
+Treat examples, cases, scenarios, analogies, anecdotes, sample calculations, and
+illustrative code as supporting context, not as default card material. Do not turn names,
+numbers, outcomes, steps, claims, or conclusions that are true only inside one example or
+case into standalone cards. Never generalize a rule from a single example. When the source
+explicitly states a reusable principle, decision criterion, or method, test that general
+idea and keep the example only as optional answer context or ai_enrichment. A complete case
+or story may become one skeleton_recall card only when the source clearly presents that
+case or story itself as something the learner should rehearse, such as their own project
+walkthrough or behavioral interview story. Never atomize its incidental details into cards.
 
 Preserve useful code and math. Do not invent unsupported claims. Put optional context or
 pitfalls in ai_enrichment, never in the tested prompt. Quote a short, exact source_excerpt

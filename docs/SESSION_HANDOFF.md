@@ -12,7 +12,7 @@
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
-| Test baseline | 99 passing, 93.80 percent coverage |
+| Test baseline | 100 passing, 93.80 percent coverage |
 | Product stage | JSON restore deployed, first-account and device sync acceptance pending |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
@@ -212,7 +212,14 @@ Do not violate these invariants:
 
 ## 8. Generation behavior
 
-The active prompt version is `anki-v2-skeleton`. Every source chunk may return at most 20 candidates. A candidate is accepted only when:
+The active prompt version is `anki-v3-example-boundary`. It treats examples,
+cases, scenarios, analogies, anecdotes, sample calculations, and illustrative
+code as supporting context instead of standalone card material. It may test an
+explicitly stated reusable principle, while keeping the example as optional
+context. A complete user project or behavioral story may become one Skeleton
+Recall card when the source clearly presents the full story as rehearsal material;
+incidental details are not atomized into cards. Every source chunk may return at
+most 20 candidates. A candidate is accepted only when:
 
 - its Pydantic schema is valid;
 - its card content passes type-specific domain validation;
@@ -284,7 +291,7 @@ node --check src/anki_card_app/static/service-worker.js
 
 At the handoff snapshot:
 
-- 99 tests pass;
+- 100 tests pass;
 - total branch-aware coverage is 93.80 percent;
 - coverage threshold is 90 percent;
 - both PWA icons are valid PNG files at 192 by 192 and 512 by 512;

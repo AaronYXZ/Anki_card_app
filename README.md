@@ -189,7 +189,7 @@ uv run pytest --cov=anki_card_app --cov-report=term-missing
 
 Current verified working-tree baseline:
 
-- 99 tests passing;
+- 100 tests passing;
 - 93.80 percent total coverage;
 - Ruff, Mypy, JavaScript syntax, manifest parsing, and live PWA endpoint checks passing.
 

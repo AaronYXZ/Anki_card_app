@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from anki_card_app.card_service import CardContent, create_draft
 from anki_card_app.generation import (
+    CARD_GENERATION_PROMPT,
+    PROMPT_VERSION,
     GeneratedCard,
     GeneratedCardBatch,
     GenerationProviderError,
@@ -71,6 +73,13 @@ class FakeGenerator:
                 )
             ]
         return GenerationResult(cards=cards, request_id=f"request-{chunk.sequence}")
+
+
+def test_generation_prompt_rejects_example_specific_card_material() -> None:
+    assert PROMPT_VERSION == "anki-v3-example-boundary"
+    assert "supporting context, not as default card material" in CARD_GENERATION_PROMPT
+    assert "Never generalize a rule from a single example" in CARD_GENERATION_PROMPT
+    assert "Never atomize its incidental details into cards" in CARD_GENERATION_PROMPT
 
 
 def setup_run(db_session: Session) -> tuple[uuid.UUID, uuid.UUID]:
