@@ -5,15 +5,15 @@
 | Field | Value |
 |---|---|
 | Project | Anki Card App |
-| Snapshot date | 2026-08-10 |
+| Snapshot date | 2026-08-13 |
 | Branch | `dev` |
 | Live deployment source commit | `08549cb Fix Railway Alembic database driver` |
 | Local URL | `http://127.0.0.1:8000` |
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
-| Test baseline | 89 passing, 95.78 percent coverage |
-| Product stage | Railway deployment healthy, first account and device sync acceptance pending |
+| Test baseline | 99 passing, 93.80 percent coverage |
+| Product stage | JSON restore implemented locally, Railway redeployment and device sync acceptance pending |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -166,6 +166,7 @@ rejected unless `AUTH_MODE=password` and `SESSION_COOKIE_SECURE=true`. See
 | `/review/{session_id}/{card_id}/rate` | POST | Persist rating and FSRS transition |
 | `/review/sessions/{session_id}` | GET | Completed-session summary |
 | `/exports/backup.json` | GET | Download all owned learning data without credentials or sessions |
+| `/restore` | GET, POST | Atomically restore a version 1 JSON export into an empty account |
 | `/install` | GET | PWA installation and keyboard guidance |
 | `/manifest.webmanifest` | GET | Root-scoped PWA manifest |
 | `/service-worker.js` | GET | Root-scoped static-shell service worker |
@@ -283,8 +284,8 @@ node --check src/anki_card_app/static/service-worker.js
 
 At the handoff snapshot:
 
-- 89 tests pass;
-- total branch-aware coverage is 95.78 percent;
+- 99 tests pass;
+- total branch-aware coverage is 93.80 percent;
 - coverage threshold is 90 percent;
 - both PWA icons are valid PNG files at 192 by 192 and 512 by 512;
 - live manifest response type is `application/manifest+json`;
@@ -328,6 +329,8 @@ Tests use an isolated SQLite database through fixtures. Production-like PostgreS
 
 - Re-uploading changed content creates a new immutable snapshot. It does not update existing cards.
 - The note ledger provides traceability, not live filesystem synchronization.
+- JSON restore is deliberately replace-only for an empty account. It does not merge
+  records into an account that already contains sources, cards, or review history.
 - Terra and Luna model availability depends on the OpenAI project and can change.
 - Adding API billing credit may take a short time to propagate. Restarting the local application refreshes cached configuration, but it does not change provider billing state.
 - A permanently pending run usually means the process stopped before its background task began or completed. Resume creates a fresh run after the two-minute safety window.

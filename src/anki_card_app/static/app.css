@@ -59,6 +59,8 @@ textarea:focus, input[type="email"]:focus, input[type="password"]:focus { outlin
 .card-form input[type="file"] { width: 100%; padding: 0.8rem; border: 1px dashed var(--line); border-radius: 0.6rem; background: white; }
 .muted, small { color: var(--muted); }
 .notice.error { max-width: 48rem; margin-top: 1rem; padding: 1rem; border-left: 4px solid var(--danger); background: #fff1ef; }
+.notice.success { max-width: 48rem; margin-top: 1rem; padding: 1rem; border-left: 4px solid var(--accent); background: #edf5ef; }
+.confirmation { display: flex !important; align-items: flex-start; }
 .offline-notice { max-width: none; margin-top: 2rem; padding: 1rem; border-left: 4px solid var(--accent); background: #edf5ef; }
 .card-list { display: grid; gap: 1rem; }
 .draft-card h2, .review-card h2 { white-space: pre-wrap; line-height: 1.35; }

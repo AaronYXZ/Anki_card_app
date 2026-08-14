@@ -108,6 +108,7 @@ Open these local pages:
 - Health check: [http://localhost:8000/health](http://localhost:8000/health)
 - Database readiness: [http://localhost:8000/ready](http://localhost:8000/ready)
 - Portable JSON export: [http://localhost:8000/exports/backup.json](http://localhost:8000/exports/backup.json)
+- Portable JSON restore: [http://localhost:8000/restore](http://localhost:8000/restore)
 
 ## Use the product
 
@@ -121,6 +122,20 @@ Open these local pages:
 6. Open Drafts and approve, edit, or reject the generated cards.
 
 Generation progress is committed after every chunk. The run page refreshes every five seconds. Each provider request has a 90-second timeout, and the workflow retries a recoverable failed chunk once. Authentication, unavailable-model, and exhausted-credit errors stop the run. After fixing the problem, select **Resume generation**. The new run reuses the imported source and avoids duplicate cards through content fingerprints.
+
+### Restore an exported backup
+
+1. Sign in to an empty account.
+2. Open `/restore`.
+3. Select a JSON file downloaded from `Export`.
+4. Confirm the empty-account warning and restore.
+
+Restore recreates source notes, generation runs, drafts, every card version,
+scheduling state, review sessions, and review logs in one transaction. IDs and
+review attempt identifiers are remapped to avoid collisions. The signed-in
+account keeps its email, password, and sessions. Its learning preferences are
+restored from the backup. A non-empty account is rejected instead of being
+overwritten or merged.
 
 ### Review cards
 
@@ -174,8 +189,8 @@ uv run pytest --cov=anki_card_app --cov-report=term-missing
 
 Current verified working-tree baseline:
 
-- 89 tests passing;
-- 95.78 percent total coverage;
+- 99 tests passing;
+- 93.80 percent total coverage;
 - Ruff, Mypy, JavaScript syntax, manifest parsing, and live PWA endpoint checks passing.
 
 ## Important constraints
@@ -186,6 +201,7 @@ Current verified working-tree baseline:
 - The fixed account exists only in explicit development auth mode. Production settings require password auth and secure cookies.
 - Dynamic content is rendered as escaped text. Any future Markdown-to-HTML feature must introduce and test an allowlist sanitizer before using trusted markup.
 - Static assets work offline, but database writes do not.
+- JSON restore requires an empty account. Merge restore and selective restore are not implemented.
 - The application does not synchronize with Anki or scan an arbitrary Obsidian directory.
 
 ## Documentation

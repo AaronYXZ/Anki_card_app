@@ -14,6 +14,7 @@ from anki_card_app.database import database_is_ready
 from anki_card_app.exports_web import router as exports_router
 from anki_card_app.imports_web import router as imports_router
 from anki_card_app.notes_web import router as notes_router
+from anki_card_app.restore_web import router as restore_router
 from anki_card_app.security import add_security_headers, prepare_csrf_token, set_csrf_cookie
 from anki_card_app.web import router as web_router
 
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
     application.include_router(imports_router)
     application.include_router(notes_router)
     application.include_router(exports_router)
+    application.include_router(restore_router)
 
     @application.get("/manifest.webmanifest", include_in_schema=False)
     def manifest() -> FileResponse:

@@ -100,8 +100,15 @@ Before private alpha, perform one restoration exercise into a separate database:
 4. sign in and verify notes, cards, due state, and review history;
 5. remove the temporary service after recording the result.
 
-The JSON export is currently for portability and inspection. Automated JSON
-restore is not implemented yet.
+The authenticated `/restore` page imports a version 1 JSON export into an empty
+account. It restores source notes, generation records, drafts, cards and versions,
+scheduling state, review sessions, and review logs atomically. It remaps IDs and
+review attempt identifiers, preserves the signed-in account credentials and
+sessions, and refuses to merge into a non-empty account.
+
+Before private alpha, test JSON recovery with a new account or a separate
+environment. Keep the original export until restored card counts, drafts,
+scheduling state, and review history have been verified.
 
 ## Mac and iPhone sync acceptance
 
