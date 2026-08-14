@@ -7,13 +7,13 @@
 | Project | Anki Card App |
 | Snapshot date | 2026-08-14 |
 | Branch | `dev` |
-| Live deployment source commit | `b5f449b Render card content as safe Markdown` |
+| Live deployment source commit | `ed72d52 Group primary navigation categories` |
 | Local URL | `http://127.0.0.1:8000` |
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
 | Test baseline | 108 passing, 93.95 percent coverage |
-| Product stage | Grouped navigation ready for deployment, first-account and device sync acceptance pending |
+| Product stage | Grouped navigation deployed, first-account and device sync acceptance pending |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
