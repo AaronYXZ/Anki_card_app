@@ -7,13 +7,13 @@
 | Project | Anki Card App |
 | Snapshot date | 2026-08-14 |
 | Branch | `dev` |
-| Live deployment source commit | `f289394 Add approved cards and code highlighting` |
+| Live deployment source commit | `b902160 Preview cards after approved edits` |
 | Local URL | `http://127.0.0.1:8000` |
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
 | Test baseline | 110 passing, 94.03 percent coverage |
-| Product stage | Post-edit card preview ready for deployment, first-account and device sync acceptance pending |
+| Product stage | Post-edit card preview deployed, first-account and device sync acceptance pending |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
