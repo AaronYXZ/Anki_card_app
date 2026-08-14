@@ -7,13 +7,13 @@
 | Project | Anki Card App |
 | Snapshot date | 2026-08-14 |
 | Branch | `dev` |
-| Live deployment source commit | `93b6970 Prevent example-specific flashcards` |
+| Live deployment source commit | `d4b7044 Guarantee daily review type quotas` |
 | Local URL | `http://127.0.0.1:8000` |
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
 | Test baseline | 104 passing, 93.93 percent coverage |
-| Product stage | Daily type quotas ready for deployment, first-account and device sync acceptance pending |
+| Product stage | Daily type quotas deployed, first-account and device sync acceptance pending |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
