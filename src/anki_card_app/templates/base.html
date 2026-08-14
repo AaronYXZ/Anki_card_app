@@ -19,14 +19,29 @@
       <a class="brand" href="/">Anki Card App</a>
       {% if request.scope.get("auth_user") %}
         <nav aria-label="Primary navigation">
-          <a href="/notes">Notes</a>
-          <a href="/imports">Imports</a>
-          <a href="/cards/new">New card</a>
-          <a href="/cards/drafts">Drafts</a>
-          <a href="/review">Review</a>
-          <a href="/exports/backup.json">Export</a>
-          <a href="/restore">Restore</a>
-          <a href="/install">Install</a>
+          <details class="nav-group" name="primary-nav-group">
+            <summary>Create</summary>
+            <div class="nav-dropdown">
+              <a href="/imports">Import</a>
+              <a href="/cards/new">New card</a>
+              <a href="/notes">Imported notes</a>
+            </div>
+          </details>
+          <a class="nav-link" href="/review">Review</a>
+          <details class="nav-group" name="primary-nav-group">
+            <summary>Modify</summary>
+            <div class="nav-dropdown">
+              <a href="/cards/drafts">Drafts</a>
+            </div>
+          </details>
+          <details class="nav-group" name="primary-nav-group">
+            <summary>Utils</summary>
+            <div class="nav-dropdown nav-dropdown-right">
+              <a href="/exports/backup.json">Export</a>
+              <a href="/install">Install</a>
+              <a href="/restore">Restore</a>
+            </div>
+          </details>
           <form action="/logout" method="post"><input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}"><button class="nav-button" type="submit">Sign out</button></form>
         </nav>
       {% endif %}

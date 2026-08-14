@@ -53,6 +53,7 @@ def test_note_ledger_tracks_source_runs_and_cards(
     detail = client.get(f"/notes/{document.id}")
 
     assert listing.status_code == 200
+    assert "<title>Imported notes · Anki Card App</title>" in listing.text
     assert "ml.md" in listing.text
     assert "2" in listing.text
     assert detail.status_code == 200

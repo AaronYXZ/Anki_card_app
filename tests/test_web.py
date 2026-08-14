@@ -42,6 +42,25 @@ def test_dashboard_and_empty_workflows(client: TestClient) -> None:
     assert "/static/app.js" in install.text
 
 
+def test_primary_navigation_is_grouped_into_four_categories(client: TestClient) -> None:
+    page = client.get("/")
+
+    assert page.text.count('class="nav-group"') == 3
+    assert page.text.count('name="primary-nav-group"') == 3
+    assert "<summary>Create</summary>" in page.text
+    assert '<a href="/imports">Import</a>' in page.text
+    assert '<a href="/cards/new">New card</a>' in page.text
+    assert '<a href="/notes">Imported notes</a>' in page.text
+    assert '<a class="nav-link" href="/review">Review</a>' in page.text
+    assert "<summary>Modify</summary>" in page.text
+    assert '<a href="/cards/drafts">Drafts</a>' in page.text
+    assert "<summary>Utils</summary>" in page.text
+    assert '<a href="/exports/backup.json">Export</a>' in page.text
+    assert '<a href="/install">Install</a>' in page.text
+    assert '<a href="/restore">Restore</a>' in page.text
+    assert ">Sign out</button>" in page.text
+
+
 def test_normal_card_create_edit_approve_and_review(
     client: TestClient, db_session: Session
 ) -> None:

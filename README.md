@@ -26,6 +26,7 @@ Implemented capabilities:
 - resume failed or stalled generation without duplicating successful cards;
 - review, edit, approve, or reject every draft before it enters learning;
 - preserve Markdown from imported notes and safely render Markdown in generated or manual cards;
+- group navigation into Create, Review, Modify, and Utils categories;
 - create a due-first daily queue that reserves 10 Normal and 3 Skeleton Recall reviews when the user's limit and available due cards allow it;
 - jump directly to the top of the draft inbox with a floating button;
 - persist idempotent FSRS-6 reviews and complete scheduling history;
