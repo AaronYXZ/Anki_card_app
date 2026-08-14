@@ -9,9 +9,9 @@
   {% if entry and card_view %}
     <article class="review-card">
       <span class="pill">{{ card_view.card.card_type.value }}</span>
-      <h2>{{ card_view.prompt }}</h2>
+      <div class="markdown-content card-prompt">{{ card_view.prompt|markdown }}</div>
       {% if entry.item.revealed_at %}
-        <div class="revealed-answer">{{ card_view.answer }}</div>
+        <div class="markdown-content revealed-answer">{{ card_view.answer|markdown }}</div>
         <div class="rating-grid" aria-label="Recall rating">
           {% for value, label, meaning in [(1, "Again", "Could not recall"), (2, "Hard", "Serious difficulty"), (3, "Good", "Some hesitation"), (4, "Easy", "Immediate recall")] %}
             <form action="/review/{{ entry.session.id }}/{{ entry.card.id }}/rate" method="post">

@@ -28,6 +28,7 @@ from anki_card_app.card_service import (
     reject_card,
 )
 from anki_card_app.database import get_session
+from anki_card_app.markdown import render_markdown
 from anki_card_app.models import (
     Card,
     CardState,
@@ -48,6 +49,7 @@ from anki_card_app.security import validate_csrf
 
 PACKAGE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
+templates.env.filters["markdown"] = render_markdown
 router = APIRouter()
 SessionDependency = Annotated[Session, Depends(get_session)]
 

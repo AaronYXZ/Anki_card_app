@@ -81,7 +81,7 @@ def test_user_content_is_rendered_as_escaped_text(client: TestClient) -> None:
         data={
             "card_type": "normal",
             "front": "<script>alert('front')</script>",
-            "back": '<img src=x onerror="alert(1)">',
+            "back": '<img src=x onerror="alert(1)">\n\n[bad](javascript:alert(1))',
         },
     )
     assert created.status_code == 200
@@ -90,4 +90,5 @@ def test_user_content_is_rendered_as_escaped_text(client: TestClient) -> None:
     assert "<script>" not in page.text
     assert "<img src=x" not in page.text
     assert "&lt;script&gt;alert" in page.text
-    assert "&lt;img src=x onerror=&#34;alert(1)&#34;&gt;" in page.text
+    assert "&lt;img src=x onerror=&quot;" in page.text
+    assert 'href="javascript:' not in page.text

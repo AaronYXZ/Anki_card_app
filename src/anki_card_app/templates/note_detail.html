@@ -33,8 +33,8 @@
         {% for item in cards %}
           <article class="source-card">
             <div class="card-meta"><span class="pill">{{ item.view.card.card_type.value }}</span><span class="pill status-{{ item.view.card.state.value }}">{{ item.view.card.state.value }}</span><span>{{ item.heading_path or "Untitled section" }}</span></div>
-            <h3>{{ item.view.prompt }}</h3>
-            <p class="answer-preview">{{ item.view.answer }}</p>
+            <div class="markdown-content card-prompt">{{ item.view.prompt|markdown }}</div>
+            <div class="markdown-content answer-preview">{{ item.view.answer|markdown }}</div>
             {% if item.view.card.state.value in editable_states %}<a class="button" href="/cards/{{ item.view.card.id }}/edit">Edit card</a>{% endif %}
           </article>
         {% endfor %}

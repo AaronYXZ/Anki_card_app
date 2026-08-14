@@ -129,6 +129,38 @@ def test_normal_card_create_edit_approve_and_review(
     assert "Good" in summary.text
 
 
+def test_manual_markdown_is_preserved_and_rendered_in_draft_and_review(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    front = "## Power\n\nWhy is **power** useful with `beta`?"
+    back = "It helps detect:\n\n- **real effects**\n- meaningful differences"
+    created = client.post(
+        "/cards/new",
+        data={"card_type": "normal", "front": front, "back": back},
+        follow_redirects=False,
+    )
+
+    assert created.status_code == 303
+    card = db_session.scalar(select(Card))
+    assert card is not None
+    version = db_session.get(CardVersion, card.current_version_id)
+    assert version is not None
+    assert version.front == front
+    assert version.back == back
+
+    inbox = client.get("/cards/drafts")
+    assert "<h2>Power</h2>" in inbox.text
+    assert "Why is <strong>power</strong> useful with <code>beta</code>?" in inbox.text
+    assert "<ul>" in inbox.text
+    assert "<strong>real effects</strong>" in inbox.text
+
+    client.post(f"/cards/{card.id}/approve", follow_redirects=False)
+    review = client.get("/review")
+    assert "<h2>Power</h2>" in review.text
+    assert "<strong>power</strong>" in review.text
+
+
 def test_cloze_card_rendering_and_rejection(client: TestClient, db_session: Session) -> None:
     created = client.post(
         "/cards/new",

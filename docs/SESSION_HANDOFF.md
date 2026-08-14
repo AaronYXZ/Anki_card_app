@@ -12,8 +12,8 @@
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
-| Test baseline | 104 passing, 93.93 percent coverage |
-| Product stage | Daily type quotas deployed, first-account and device sync acceptance pending |
+| Test baseline | 107 passing, 93.95 percent coverage |
+| Product stage | Safe card Markdown ready for deployment, first-account and device sync acceptance pending |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -105,6 +105,7 @@ Important modules:
 | `src/anki_card_app/notes_web.py` | Imported-note ledger and note-to-card traceability |
 | `src/anki_card_app/import_service.py` | Safe upload parsing, ZIP limits, Markdown chunking, content hashing |
 | `src/anki_card_app/generation.py` | Prompt, structured OpenAI output, validation, deduplication, progress persistence |
+| `src/anki_card_app/markdown.py` | CommonMark rendering with embedded HTML disabled |
 | `src/anki_card_app/card_service.py` | Card validation, immutable versions, lifecycle transitions |
 | `src/anki_card_app/review_service.py` | Daily queue, reveal rules, idempotent rating transaction |
 | `src/anki_card_app/fsrs_adapter.py` | FSRS state creation, restoration, application, and snapshots |
@@ -208,18 +209,21 @@ Do not violate these invariants:
 12. Password mode never falls back to the fixed development identity.
 13. Raw authentication session tokens are never persisted. Only SHA-256 digests are stored.
 14. Every POST validates a CSRF token derived from the current Session after login.
-15. Dynamic content is Jinja-autoescaped text. No template bypasses escaping.
+15. Ordinary dynamic content is Jinja-autoescaped. Card Markdown is converted by the shared renderer with embedded HTML and unsafe links disabled before templates receive safe markup.
 
 ## 8. Generation behavior
 
-The active prompt version is `anki-v3-example-boundary`. It treats examples,
+The active prompt version is `anki-v4-markdown-preservation`. It treats examples,
 cases, scenarios, analogies, anecdotes, sample calculations, and illustrative
 code as supporting context instead of standalone card material. It may test an
 explicitly stated reusable principle, while keeping the example as optional
 context. A complete user project or behavioral story may become one Skeleton
 Recall card when the source clearly presents the full story as rehearsal material;
 incidental details are not atomized into cards. Every source chunk may return at
-most 20 candidates. A candidate is accepted only when:
+most 20 candidates. The prompt also requires generated fields to retain useful
+source Markdown such as lists, emphasis, links, inline code, fenced code, and math
+notation. Exact source excerpts retain their original Markdown. A candidate is
+accepted only when:
 
 - its Pydantic schema is valid;
 - its card content passes type-specific domain validation;

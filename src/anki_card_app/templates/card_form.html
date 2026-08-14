@@ -10,7 +10,7 @@
   <section class="page-heading">
     <p class="eyebrow">{{ "Versioned editing" if editing else "Manual draft" }}</p>
     <h1>{{ "Edit card" if editing else "Create a card" }}</h1>
-    <p>{{ "Saving creates a new immutable version." if editing else "The card remains a draft until you approve it." }}</p>
+    <p>{{ "Saving creates a new immutable version." if editing else "The card remains a draft until you approve it." }} Markdown is supported.</p>
   </section>
   {% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
   <form method="post" class="card-form">
@@ -25,10 +25,10 @@
     {% else %}
       <p class="pill">{{ selected_type }}</p>
     {% endif %}
-    <label>Question or skeleton outline <textarea name="front" rows="6" placeholder="Resolving disagreement&#10;&#10;1. Situation&#10;2. Conflict&#10;3. Action&#10;4. Result&#10;5. Lesson">{{ form_front or "" }}</textarea></label>
-    <label>Answer or completed skeleton <textarea name="back" rows="10" placeholder="1. Situation&#10;- Brief trigger details&#10;&#10;2. Conflict&#10;- Core tension">{{ form_back or "" }}</textarea></label>
-    <label>Cloze text <textarea name="cloze_text" rows="5" placeholder="Power equals {{ '{{' }}c1::1 minus Type II error{{ '}}' }}.">{{ form_cloze or "" }}</textarea></label>
-    <label>Back extra <textarea name="back_extra" rows="3">{{ form_extra or "" }}</textarea></label>
+    <label>Question or skeleton outline <textarea name="front" rows="6" placeholder="## Resolving disagreement&#10;&#10;1. Situation&#10;2. Conflict&#10;3. Action&#10;4. Result&#10;5. Lesson">{{ form_front or "" }}</textarea></label>
+    <label>Answer or completed skeleton <textarea name="back" rows="10" placeholder="1. **Situation**&#10;   - Brief trigger details&#10;&#10;2. **Conflict**&#10;   - Core tension">{{ form_back or "" }}</textarea></label>
+    <label>Cloze text <textarea name="cloze_text" rows="5" placeholder="Power equals **{{ '{{' }}c1::1 minus Type II error{{ '}}' }}**.">{{ form_cloze or "" }}</textarea></label>
+    <label>Back extra <textarea name="back_extra" rows="3" placeholder="Optional Markdown context">{{ form_extra or "" }}</textarea></label>
     <div class="actions">
       <button class="button primary" type="submit">{{ "Save new version" if editing else "Create draft" }}</button>
       <a class="button" href="/cards/drafts">Cancel</a>

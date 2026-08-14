@@ -30,7 +30,10 @@ def test_note_ledger_tracks_source_runs_and_cards(
         db_session,
         user_id=document.user_id,
         card_type=CardType.NORMAL,
-        content=CardContent(front="What is bias?", back="Systematic model error."),
+        content=CardContent(
+            front="What is **bias**?",
+            back="- Systematic model error\n- A persistent deviation",
+        ),
         source_document_id=document.id,
         source_chunk_id=chunk.id,
         source_excerpt=chunk.text,
@@ -56,7 +59,8 @@ def test_note_ledger_tracks_source_runs_and_cards(
     assert "2" in detail.text
     assert "1</strong><span>awaiting review" in detail.text
     assert "1</strong><span>rejected" in detail.text
-    assert "What is bias?" in detail.text
+    assert "What is <strong>bias</strong>?" in detail.text
+    assert "<li>Systematic model error</li>" in detail.text
     assert f"/cards/{draft.id}/edit" in detail.text
     assert "Generation history" in detail.text
 

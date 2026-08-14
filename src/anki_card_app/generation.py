@@ -33,7 +33,7 @@ from anki_card_app.models import (
     utc_now,
 )
 
-PROMPT_VERSION = "anki-v3-example-boundary"
+PROMPT_VERSION = "anki-v4-markdown-preservation"
 CARD_GENERATION_PROMPT = """
 You create durable interview-preparation flashcards for machine learning engineers.
 Extract the source's key concepts, facts, decisions, equations, code behavior, and
@@ -66,6 +66,12 @@ idea and keep the example only as optional answer context or ai_enrichment. A co
 or story may become one skeleton_recall card only when the source clearly presents that
 case or story itself as something the learner should rehearse, such as their own project
 walkthrough or behavioral interview story. Never atomize its incidental details into cards.
+
+Card content supports Markdown. Preserve useful Markdown from the source when carrying
+material into front, back, cloze_text, back_extra, or ai_enrichment. In particular, keep
+lists, emphasis, links, inline code, fenced code blocks, and math notation instead of
+flattening them into plain text. Do not add Markdown decoration that changes the source's
+meaning. The source_excerpt must remain an exact substring, including its original Markdown.
 
 Preserve useful code and math. Do not invent unsupported claims. Put optional context or
 pitfalls in ai_enrichment, never in the tested prompt. Quote a short, exact source_excerpt
