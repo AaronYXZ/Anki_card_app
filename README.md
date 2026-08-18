@@ -158,6 +158,10 @@ The rating mapping is standard FSRS: Again `1`, Hard `2`, Good `3`, Easy `4`. Re
 
 Open `/install` for platform-specific instructions. The application shell and static assets are cached. Imports, approvals, ratings, and all other data writes require a connection to the server. Offline review writes are intentionally unsupported.
 
+Draft cards are constrained to the phone viewport. Long links, identifiers,
+Markdown code blocks, and table cells wrap instead of requiring horizontal
+scrolling.
+
 ### Deploy and synchronize devices
 
 See [Railway Deployment and Sync Acceptance](docs/RAILWAY_DEPLOYMENT.md). The

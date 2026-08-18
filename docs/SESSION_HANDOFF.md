@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | Project | Anki Card App |
-| Snapshot date | 2026-08-14 |
+| Snapshot date | 2026-08-17 |
 | Branch | `dev` |
 | Live deployment source commit | `b902160 Preview cards after approved edits` |
 | Local URL | `http://127.0.0.1:8000` |
@@ -13,7 +13,7 @@
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
 | Test baseline | 110 passing, 94.03 percent coverage |
-| Product stage | Post-edit card preview deployed, first-account and device sync acceptance pending |
+| Product stage | Mobile draft layout completed locally, deployment and first-account device sync acceptance pending |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -285,6 +285,11 @@ The app provides a manifest, application icons, standalone display mode, install
 - never intercept or cache POST requests;
 - never promise offline ratings or imports.
 
+Draft cards constrain Markdown content to the phone viewport. Long links,
+identifiers, fenced code, and table cells wrap rather than creating horizontal
+page or card scrolling. The shell cache is `anki-shell-v7` so installed PWAs
+refresh the updated stylesheet.
+
 Any future offline-write feature requires a synchronization protocol, conflict rules, idempotency, and user-visible pending state. Do not extend the current service worker into offline database writes without that design.
 
 ## 11. Verification baseline
@@ -302,8 +307,8 @@ node --check src/anki_card_app/static/service-worker.js
 
 At the handoff snapshot:
 
-- 100 tests pass;
-- total branch-aware coverage is 93.80 percent;
+- 110 tests pass;
+- total branch-aware coverage is 94.03 percent;
 - coverage threshold is 90 percent;
 - both PWA icons are valid PNG files at 192 by 192 and 512 by 512;
 - live manifest response type is `application/manifest+json`;
@@ -330,7 +335,10 @@ Tests use an isolated SQLite database through fixtures. Production-like PostgreS
 - No implemented 30-day card-frequency metric for cards reviewed at least five times.
 - No source and card deletion workflow.
 - No provider privacy notice or data-retention disclosure.
-- No mobile browser end-to-end test or formal accessibility pass.
+- No automated mobile browser end-to-end test or formal accessibility pass. A
+  manual 402 by 874 CSS-pixel draft-page check passed with long identifiers,
+  URLs, Markdown code, and table-like content, with page and card scroll widths
+  equal to their visible widths.
 
 ### Deliberately deferred product scope
 

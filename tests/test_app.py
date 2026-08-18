@@ -46,12 +46,16 @@ def test_pwa_resources_are_served_from_root_scope() -> None:
     assert service_worker.status_code == 200
     assert service_worker.headers["service-worker-allowed"] == "/"
     assert "no-cache" in service_worker.headers["cache-control"]
-    assert 'CACHE_NAME = "anki-shell-v6"' in service_worker.text
+    assert 'CACHE_NAME = "anki-shell-v7"' in service_worker.text
     assert 'request.method !== "GET"' in service_worker.text
     assert 'caches.match("/static/offline.html")' in service_worker.text
     assert styles.status_code == 200
     assert ".skeleton-prompt { font-weight: 400; }" in styles.text
     assert ".highlight .k" in styles.text
+    assert ".draft-card .markdown-content pre" in styles.text
+    assert "white-space: pre-wrap" in styles.text
+    assert ".draft-card .markdown-content table" in styles.text
+    assert "table-layout: fixed" in styles.text
 
 
 def test_pwa_icons_are_valid_png_resources() -> None:
