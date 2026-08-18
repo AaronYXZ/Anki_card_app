@@ -1,73 +1,69 @@
 # Anki Card App
 
-An AI-assisted spaced-repetition platform for machine learning interview preparation. It turns Markdown and Obsidian notes into reviewable flashcard drafts, keeps the learner in control of approval and editing, and schedules approved cards with FSRS-6.
+一个面向机器学习面试准备的 AI 辅助间隔复习系统。它把 Markdown 或
+Obsidian 笔记转换为卡片草稿，由用户审核后进入 FSRS-6 复习队列。
 
-## Product status
+生产环境：<https://web-production-a42e0.up.railway.app>
 
-The local MVP core loop is working:
+## 当前状态
+
+核心流程已经部署并通过 Mac 与 iPhone 同步验收：
 
 ```text
-Markdown note
-    -> AI-generated drafts
-    -> human approval or editing
-    -> daily review queue
-    -> Again, Hard, Good, or Easy rating
-    -> persistent FSRS schedule and review history
+Markdown 笔记
+    -> AI 生成草稿
+    -> 人工批准、编辑或拒绝
+    -> 每日复习队列
+    -> Again、Hard、Good、Easy
+    -> PostgreSQL 保存历史和 FSRS 排程
 ```
 
-Implemented capabilities:
+当前版本支持 Markdown/ZIP 导入、Normal/Cloze/Skeleton Recall 卡片、代码高亮、
+草稿审核、已批准卡片编辑、FSRS-6 排程、JSON 完整备份与恢复，以及 PWA 安装。
+所有学习数据接口都需要登录，写操作使用 CSRF 防护。
 
-- import one Markdown file or a ZIP containing Markdown files;
-- track imported note snapshots and their generated cards;
-- split notes into heading-aware source chunks;
-- generate Normal, Cloze, and Skeleton Recall cards;
-- choose Terra or Luna for each import;
-- show per-chunk generation progress and actionable provider errors;
-- resume failed or stalled generation without duplicating successful cards;
-- review, edit, approve, or reject every draft before it enters learning;
-- preserve Markdown from imported notes and safely render Markdown in generated or manual cards;
-- syntax-highlight recognized fenced code languages such as Python;
-- browse and edit approved cards from the Cards library;
-- return approved-card edits to a review-format preview without starting a review session;
-- keep Skeleton Recall prompts at normal weight unless Markdown explicitly adds emphasis;
-- group navigation into Create, Review, Modify, and Utils categories;
-- create a due-first daily queue that reserves 10 Normal and 3 Skeleton Recall reviews when the user's limit and available due cards allow it;
-- jump directly to the top of the draft inbox with a floating button;
-- persist idempotent FSRS-6 reviews and complete scheduling history;
-- show daily counts and a 30-day first-attempt recall metric;
-- install the interface as a PWA on supported mobile and desktop browsers;
-- authenticate private-alpha users with revocable server-side sessions;
-- isolate every existing notes, cards, imports, reviews, and metrics route by request identity;
-- require Session-bound CSRF tokens for every mutation;
-- escape user and model content as text and enforce restrictive browser security headers;
-- deploy with Railway config-as-code, migration gating, and database readiness checks;
-- export all owned learning data as a portable JSON backup;
-- use `Space` to reveal an answer and `1` through `4` to rate it.
+## 安装和使用
 
-This is not yet private-alpha ready. Authentication, authorization, CSRF, CSP,
-and text-rendering boundaries are implemented, but invite acceptance, password
-recovery, login rate limits, durable background jobs, live production deployment,
-database restoration, and full mobile or accessibility acceptance testing remain open.
+普通用户不需要下载代码。网页版和 PWA 使用同一个云端账户与数据库。
 
-## Technology
+### iPhone
 
-| Layer | Choice |
+1. 用 Safari 打开生产环境网址并登录。
+2. 点击 Safari 的分享按钮。
+3. 选择 **Add to Home Screen**。
+4. 从主屏幕打开 Anki Card App。
+
+### Mac
+
+可以直接用 Safari 或其他浏览器，也可以安装成 PWA：
+
+1. 用 Safari 打开生产环境网址并登录。
+2. 选择 **File > Add to Dock**。
+3. 从 Dock 或 Applications 打开应用。
+
+Mac 网页版、Mac PWA 和 iPhone PWA 功能相同。当前版本需要联网才能导入、批准、
+编辑或复习。静态页面可以被缓存，但离线复习写入尚未实现。
+
+### 第一次使用
+
+1. 在 **Create > Import** 上传 Markdown 文件或包含 Markdown 的 ZIP。
+2. 等待 AI 生成卡片草稿。
+3. 在 **Modify > Drafts** 批准、编辑或拒绝草稿。
+4. 在 **Review** 完成当天的复习。
+5. 在 **Utils > Export** 下载第一份 JSON 备份。
+
+## 本地开发安装
+
+### 依赖
+
+| 工具 | 用途 |
 |---|---|
-| Application | Python 3.12, FastAPI |
-| UI | Server-rendered Jinja, CSS, targeted JavaScript |
-| Database | PostgreSQL, SQLAlchemy 2, Alembic |
-| Scheduling | Py-FSRS, FSRS-6 |
-| AI generation | OpenAI Responses API with structured output |
-| Packaging | `uv` and `pyproject.toml` |
-| Testing | Pytest, Ruff, Mypy, coverage |
+| Python 3.12+ | 应用运行环境 |
+| `uv` | Python 依赖和命令管理 |
+| Docker Compose | 本地 PostgreSQL |
+| OpenAI API key | 仅 AI 卡片生成需要 |
 
-## Local setup
-
-Requirements:
-
-- `uv`
-- Docker with Compose
-- an OpenAI API key for AI card generation
+### 启动
 
 ```bash
 cp .env.example .env
@@ -77,145 +73,225 @@ uv run alembic upgrade head
 uv run uvicorn anki_card_app.main:app --reload
 ```
 
-Add the API key to `.env` without quotes:
+打开 <http://localhost:8000>。
+
+如需 AI 生成功能，把 key 加到 `.env`，不要加引号：
 
 ```dotenv
 OPENAI_API_KEY=your_api_key_here
 ```
 
-Do not commit `.env`. Restart the application after changing environment variables.
+修改 `.env` 后需要重启应用。`.env` 包含秘密信息，不能提交到 Git。
+没有 API key 时，手动创建卡片、复习、导出和恢复仍然可以使用。
 
-Local development defaults to `AUTH_MODE=development`, which explicitly keeps
-the fixed development account. To exercise password authentication locally:
+本地默认使用 `AUTH_MODE=development`。如需测试密码登录：
 
 ```bash
-uv run alembic upgrade head
 uv run anki-card-admin create-user --email you@example.com
 ```
 
-Then change `.env` and restart Uvicorn:
+然后修改 `.env` 并重启：
 
 ```dotenv
 AUTH_MODE=password
 SESSION_COOKIE_SECURE=false
 ```
 
-Open `/login`. Passwords must contain at least 12 characters. Use
-`uv run anki-card-admin set-password --email you@example.com` to change a
-password and revoke every session for that account.
+密码至少 12 个字符。修改密码使用：
 
-Open these local pages:
+```bash
+uv run anki-card-admin set-password --email you@example.com
+```
 
-- App: [http://localhost:8000](http://localhost:8000)
-- Import notes: [http://localhost:8000/imports/new](http://localhost:8000/imports/new)
-- Imported notes ledger: [http://localhost:8000/notes](http://localhost:8000/notes)
-- Draft review: [http://localhost:8000/cards/drafts](http://localhost:8000/cards/drafts)
-- Daily review: [http://localhost:8000/review](http://localhost:8000/review)
-- PWA installation: [http://localhost:8000/install](http://localhost:8000/install)
-- Health check: [http://localhost:8000/health](http://localhost:8000/health)
-- Database readiness: [http://localhost:8000/ready](http://localhost:8000/ready)
-- Portable JSON export: [http://localhost:8000/exports/backup.json](http://localhost:8000/exports/backup.json)
-- Portable JSON restore: [http://localhost:8000/restore](http://localhost:8000/restore)
+## 项目结构
 
-## Use the product
+```text
+Anki_card_app/
+├── src/anki_card_app/
+│   ├── app.py                 # FastAPI 应用、静态资源和 PWA 路由
+│   ├── main.py                # ASGI 入口
+│   ├── models.py              # SQLAlchemy 数据模型
+│   ├── database.py            # 数据库连接和 readiness 检查
+│   ├── web.py                 # 卡片、草稿和复习页面
+│   ├── imports_web.py         # 笔记上传和生成任务
+│   ├── notes_web.py           # Imported Notes 页面
+│   ├── generation.py          # OpenAI 结构化卡片生成
+│   ├── import_service.py      # Markdown/ZIP 解析和分块
+│   ├── card_service.py        # 卡片版本和状态变化
+│   ├── review_service.py      # 每日队列和原子复习写入
+│   ├── fsrs_adapter.py        # FSRS-6 状态转换
+│   ├── export_service.py      # JSON 备份生成
+│   ├── restore_service.py     # JSON 校验和原子恢复
+│   ├── auth*.py               # 登录、Session 和身份隔离
+│   ├── security.py            # CSRF、CSP 和安全响应头
+│   ├── templates/             # Jinja 页面
+│   └── static/                # CSS、JavaScript、PWA 和图标
+├── migrations/                # Alembic 数据库迁移
+├── tests/                     # 单元、服务和 Web 测试
+├── docs/                      # PRD、开发计划和运维说明
+├── compose.yaml               # 本地 PostgreSQL
+├── railway.json               # Railway 构建、迁移和健康检查
+└── pyproject.toml             # 依赖、测试和代码质量配置
+```
 
-### Generate cards from a note
+核心分层：
 
-1. Set `OPENAI_API_KEY` and restart the service.
-2. Open `/imports/new`.
-3. Choose Terra or Luna.
-4. Upload a `.md` file or a ZIP archive.
-5. Watch each source chunk move from pending to completed or failed.
-6. Open Drafts and approve, edit, or reject the generated cards.
+```text
+Jinja 页面和少量 JavaScript
+            |
+            v
+       FastAPI 路由
+            |
+            v
+ Service 层: import / generation / card / review / restore
+            |
+            v
+ SQLAlchemy 2 + PostgreSQL + FSRS 状态
+```
 
-Generation progress is committed after every chunk. The run page refreshes every five seconds. Each provider request has a 90-second timeout, and the workflow retries a recoverable failed chunk once. Authentication, unavailable-model, and exhausted-credit errors stop the run. After fixing the problem, select **Resume generation**. The new run reuses the imported source and avoids duplicate cards through content fingerprints.
+网页不会直接操作数据库。排程算法在服务器端执行，因此 Mac、iPhone 和未来的其他
+客户端都可以共享同一套学习规则。
 
-### Restore an exported backup
+## 技术栈
 
-1. Sign in to an empty account.
-2. Open `/restore`.
-3. Select a JSON file downloaded from `Export`.
-4. Confirm the empty-account warning and restore.
-
-Restore recreates source notes, generation runs, drafts, every card version,
-scheduling state, review sessions, and review logs in one transaction. IDs and
-review attempt identifiers are remapped to avoid collisions. The signed-in
-account keeps its email, password, and sessions. Its learning preferences are
-restored from the backup. A non-empty account is rejected instead of being
-overwritten or merged.
-
-### Review cards
-
-1. Approve at least one draft.
-2. Open `/review`.
-3. Attempt recall before revealing the answer.
-4. Select Again, Hard, Good, or Easy.
-5. Complete the queue and inspect the session summary.
-
-The rating mapping is standard FSRS: Again `1`, Hard `2`, Good `3`, Easy `4`. Review submission uses a unique attempt identifier so a retry cannot create a second review event.
-
-### Install the PWA
-
-Open `/install` for platform-specific instructions. The application shell and static assets are cached. Imports, approvals, ratings, and all other data writes require a connection to the server. Offline review writes are intentionally unsupported.
-
-Draft cards are constrained to the phone viewport. Long links, identifiers,
-Markdown code blocks, and table cells wrap instead of requiring horizontal
-scrolling.
-
-### Deploy and synchronize devices
-
-See [Railway Deployment and Sync Acceptance](docs/RAILWAY_DEPLOYMENT.md). The
-shared PostgreSQL database is the V1 synchronization source. Mac and iPhone do
-not synchronize directly with each other.
-
-## Configuration
-
-See [.env.example](.env.example) for every setting. The most important values are:
-
-| Variable | Purpose | Default |
+| 层 | 技术 | 作用 |
 |---|---|---|
-| `AUTH_MODE` | Explicit development bypass or password authentication | `development` |
-| `SESSION_COOKIE_NAME` | Authentication cookie name | `anki_session` |
-| `CSRF_COOKIE_NAME` | Pre-login and development CSRF cookie name | `anki_csrf` |
-| `SESSION_LIFETIME_DAYS` | Absolute session lifetime | `30` |
-| `SESSION_COOKIE_SECURE` | Restrict the cookie to HTTPS | `false` |
-| `DATABASE_URL` | PostgreSQL connection | local Compose database on port 5433 |
-| `OPENAI_API_KEY` | Enables card generation | empty |
-| `OPENAI_MODEL` | Default import model | `gpt-5.6-terra` |
-| `OPENAI_TIMEOUT_SECONDS` | Provider request timeout | `90` |
-| `MAX_UPLOAD_BYTES` | Uploaded file limit | `10000000` |
-| `MAX_ARCHIVE_FILES` | ZIP entry limit | `250` |
-| `MAX_ARCHIVE_UNCOMPRESSED_BYTES` | Expanded ZIP limit | `50000000` |
+| 后端 | Python 3.12、FastAPI、Uvicorn | 页面、身份验证和业务接口 |
+| 前端 | Jinja、CSS、少量 JavaScript | 轻量服务器渲染 PWA |
+| 数据 | PostgreSQL、SQLAlchemy 2、Alembic | 云端状态和数据库迁移 |
+| 排程 | Py-FSRS、FSRS-6 | 计算下一次复习时间 |
+| AI | OpenAI Responses API、Pydantic structured output | 从笔记生成结构化草稿 |
+| 内容 | markdown-it-py、Pygments | 安全 Markdown 和代码高亮 |
+| 工程 | uv、Pytest、Ruff、Mypy、coverage | 依赖、测试和静态检查 |
+| 部署 | Railway、Railpack、GitHub | Web 服务、PostgreSQL 和发布 |
 
-Terra and Luna are the only models exposed by the current import form. Confirm API access and pricing before changing this allowlist.
+## Mac 和 iPhone 如何共享数据
 
-## Quality checks
+```text
+Mac Browser / PWA ----\
+                       \
+iPhone Safari / PWA ---- HTTPS ---> FastAPI ---> Railway PostgreSQL
+                       /
+Other Browser --------/
+```
+
+共享机制有四个关键点：
+
+1. 两台设备登录同一个生产账户。
+2. 所有卡片、草稿、复习历史和排程都保存在 PostgreSQL。
+3. 每次批准、编辑或评分都通过 FastAPI 写入服务器。
+4. 另一台设备刷新后从同一个 PostgreSQL 读取最新状态。
+
+设备之间不直接传文件，也不依赖 iCloud 同步应用数据。每个设备拥有独立的登录
+Session，因此在一个设备退出不会自动让另一个设备退出。
+
+一次复习会在同一数据库事务中保存 review log 和新的 FSRS 排程。`attempt_id`
+保证网络重试不会重复记录同一次评分。当前没有 IndexedDB 离线写入、冲突合并或
+后台同步，断网时不要继续复习。
+
+详细部署和验收步骤见
+[Railway Deployment and Sync Acceptance](docs/RAILWAY_DEPLOYMENT.md)。
+
+## 数据备份与恢复
+
+### 推荐的低成本方案
+
+当前 Railway 页面只向 Pro 计划开放原生 Backups 和 PITR。非 Pro 计划应使用应用
+内置的 JSON 备份。不要为了测试恢复而删除、重建或覆盖生产数据库。
+
+创建备份：
+
+1. 登录生产环境。
+2. 打开 **Utils > Export**。
+3. 下载文件，例如 `anki-card-app-2026-08-17.json`。
+4. 保存到私人 iCloud Drive、加密磁盘或其他受保护位置。
+5. 每周备份一次，并在大量导入或编辑后额外备份。
+
+JSON 备份包含：
+
+| 数据 | 是否包含 |
+|---|---|
+| 导入笔记和分块 | 是 |
+| 生成记录、草稿、卡片和所有卡片版本 | 是 |
+| FSRS 排程、复习 Session 和 review logs | 是 |
+| 用户时区和学习偏好 | 是 |
+| 密码 hash、Session token、OpenAI API key | 否 |
+
+备份仍然包含邮箱、原始笔记和学习内容，必须按私人数据保管，不要提交到 GitHub。
+
+### 恢复 JSON
+
+1. 登录一个没有学习数据的空账户。
+2. 打开 **Utils > Restore**。
+3. 选择由本应用导出的 version 1 JSON 文件。
+4. 确认空账户提示并执行恢复。
+5. 检查笔记、草稿、卡片、due 状态和复习历史。
+
+恢复会先完整验证文件，再在一个数据库事务中写入。任何错误都会回滚，不会留下
+一半数据。恢复保留当前登录账户的邮箱、密码和 Session，只恢复学习数据与偏好。
+
+重要限制：恢复只接受空账户，不支持合并、选择性恢复或覆盖已有学习数据。
+
+### Railway Pro
+
+如果以后升级 Railway Pro，可以在 PostgreSQL 服务的 **Backups** 页面启用原生
+volume snapshots 和 PITR。即使开启 Railway 原生备份，仍建议保留 JSON 导出，
+因为 JSON 更容易迁移到其他服务。
+
+## 主要业务规则
+
+| 规则 | 当前行为 |
+|---|---|
+| AI 生成 | 只生成草稿，不自动进入复习 |
+| Review history | Append-only，不覆盖历史评分 |
+| Card edits | 新增不可变 CardVersion |
+| Daily queue | 条件允许时至少 10 Normal 和 3 Skeleton Recall |
+| Skeleton prompt | 只有明确 Markdown 才加粗 |
+| Markdown | 禁止嵌入 raw HTML 和不安全链接 |
+| Offline | 只缓存静态资源，不接受离线写入 |
+
+## 配置
+
+完整配置见 [.env.example](.env.example)。生产环境至少需要：
+
+```dotenv
+APP_ENV=production
+APP_DEBUG=false
+AUTH_MODE=password
+SESSION_COOKIE_SECURE=true
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+OPENAI_API_KEY=stored_in_railway_secrets
+OPENAI_MODEL=gpt-5.6-terra
+```
+
+Railway 在部署前执行 `alembic upgrade head`，使用 `/ready` 验证 PostgreSQL，只有
+数据库可用时新版本才会接收流量。生产数据库保持私有，Web 服务通过 Railway
+reference variable 获取连接地址。
+
+## 测试
 
 ```bash
 uv run ruff format --check src tests migrations
 uv run ruff check src tests migrations
 uv run mypy src
 uv run pytest --cov=anki_card_app --cov-report=term-missing
+node --check src/anki_card_app/static/app.js
+node --check src/anki_card_app/static/service-worker.js
 ```
 
-Current verified working-tree baseline:
+当前基线：110 项测试通过，总覆盖率 94.03%。
 
-- 100 tests passing;
-- 93.80 percent total coverage;
-- Ruff, Mypy, JavaScript syntax, manifest parsing, and live PWA endpoint checks passing.
+## 已知限制
 
-## Important constraints
+| 范围 | 限制 |
+|---|---|
+| AI 任务 | 当前使用 FastAPI 进程内 background task，部署可能中断生成 |
+| 导入 | 笔记是不可变快照，不会自动扫描 Obsidian 文件夹 |
+| 恢复 | 只能恢复到空账户，不能合并 |
+| 同步 | 需要联网，没有离线写入和冲突处理 |
+| 账户 | 尚无自助注册、密码恢复和账户删除流程 |
 
-- Imported notes are immutable snapshots. Source-file change detection and automatic card reconciliation are deferred.
-- AI output is always a draft. It never enters the review queue without user approval.
-- Generation currently runs in FastAPI in-process background tasks. A process restart can interrupt it.
-- The fixed account exists only in explicit development auth mode. Production settings require password auth and secure cookies.
-- Dynamic content is rendered as escaped text. Any future Markdown-to-HTML feature must introduce and test an allowlist sanitizer before using trusted markup.
-- Static assets work offline, but database writes do not.
-- JSON restore requires an empty account. Merge restore and selective restore are not implemented.
-- The application does not synchronize with Anki or scan an arbitrary Obsidian directory.
-
-## Documentation
+## 文档
 
 - [Product requirements](docs/PRD.md)
 - [Development plan](docs/DEVELOPMENT_PLAN.md)
@@ -223,4 +299,5 @@ Current verified working-tree baseline:
 - [Authentication decision and threat model](docs/AUTHENTICATION.md)
 - [Railway deployment and sync acceptance](docs/RAILWAY_DEPLOYMENT.md)
 
-The handoff specification is the canonical starting point for the next development session. It records the current architecture, invariants, known gaps, validation state, and recommended next task.
+继续开发前先阅读 `docs/SESSION_HANDOFF.md`。它记录当前部署、数据约束、测试基线和
+下一项任务。
