@@ -5,15 +5,15 @@
 | Field | Value |
 |---|---|
 | Project | Anki Card App |
-| Snapshot date | 2026-08-17 |
+| Snapshot date | 2026-08-22 |
 | Branch | `dev` |
 | Live deployment source commit | `4640f38 Fit draft cards to mobile screens` |
 | Local URL | `http://127.0.0.1:8000` |
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
-| Test baseline | 110 passing, 94.03 percent coverage |
-| Product stage | Mobile draft layout deployed, first-account device sync acceptance pending |
+| Test baseline | 111 passing, 94.08 percent coverage |
+| Product stage | Mac/iPhone sync and mobile acceptance passed, source-ordered drafts pending deployment |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -234,6 +234,11 @@ accepted only when:
 
 Progress is saved after every chunk. Chunk failures are tracked separately, which allows a partial run to preserve successful work.
 
+The Draft inbox groups cards by their most recent import or manual-creation batch. Imported
+cards follow `SourceChunk.sequence`, then the position of their exact `source_excerpt` inside
+the chunk. This preserves the original note order even when cards were created in a different
+order. Approve and reject redirects use the same ordering.
+
 Provider error behavior:
 
 | Failure | User-facing behavior |
@@ -307,8 +312,8 @@ node --check src/anki_card_app/static/service-worker.js
 
 At the handoff snapshot:
 
-- 110 tests pass;
-- total branch-aware coverage is 94.03 percent;
+- 111 tests pass;
+- total branch-aware coverage is 94.08 percent;
 - coverage threshold is 90 percent;
 - both PWA icons are valid PNG files at 192 by 192 and 512 by 512;
 - live manifest response type is `application/manifest+json`;

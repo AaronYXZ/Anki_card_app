@@ -21,8 +21,8 @@ Markdown 笔记
 ```
 
 当前版本支持 Markdown/ZIP 导入、Normal/Cloze/Skeleton Recall 卡片、代码高亮、
-草稿审核、已批准卡片编辑、FSRS-6 排程、JSON 完整备份与恢复，以及 PWA 安装。
-所有学习数据接口都需要登录，写操作使用 CSRF 防护。
+按原笔记顺序审核草稿、已批准卡片编辑、FSRS-6 排程、JSON 完整备份与恢复，以及
+PWA 安装。所有学习数据接口都需要登录，写操作使用 CSRF 防护。
 
 ## 安装和使用
 
@@ -281,7 +281,7 @@ node --check src/anki_card_app/static/app.js
 node --check src/anki_card_app/static/service-worker.js
 ```
 
-当前基线：110 项测试通过，总覆盖率 94.03%。
+当前基线：111 项测试通过，总覆盖率 94.08%。
 
 ## 已知限制
 

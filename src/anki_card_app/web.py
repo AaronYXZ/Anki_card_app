@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, NoReturn
 
@@ -35,6 +36,8 @@ from anki_card_app.models import (
     CardType,
     CardVersion,
     ReviewSession,
+    SourceChunk,
+    SourceDocument,
 )
 from anki_card_app.review_service import (
     ReviewError,
@@ -97,16 +100,54 @@ def card_views_for_state(
     return [make_card_view(card, version) for card, version in rows]
 
 
+def _timestamp(value: datetime) -> float:
+    normalized = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+    return normalized.timestamp()
+
+
+def _source_excerpt_position(chunk: SourceChunk | None, version: CardVersion) -> int:
+    if chunk is None or not version.source_excerpt:
+        return 0
+    position = chunk.text.find(version.source_excerpt)
+    return position if position >= 0 else len(chunk.text)
+
+
+def draft_card_views(session: Session, *, user_id: uuid.UUID) -> list[CardView]:
+    query_rows = session.execute(
+        select(Card, CardVersion, SourceChunk, SourceDocument)
+        .join(CardVersion, CardVersion.id == Card.current_version_id)
+        .outerjoin(SourceChunk, SourceChunk.id == Card.source_chunk_id)
+        .outerjoin(SourceDocument, SourceDocument.id == Card.source_document_id)
+        .where(Card.user_id == user_id, Card.state == CardState.DRAFT)
+    ).all()
+    rows: list[tuple[Card, CardVersion, SourceChunk | None, SourceDocument | None]] = [
+        (card, version, chunk, document) for card, version, chunk, document in query_rows
+    ]
+
+    def source_order(
+        row: tuple[Card, CardVersion, SourceChunk | None, SourceDocument | None],
+    ) -> tuple[float, str, int, int, float, str]:
+        card, version, chunk, document = row
+        batch_time = document.imported_at if document is not None else card.created_at
+        group_id = str(document.id) if document is not None else str(card.id)
+        chunk_sequence = chunk.sequence if chunk is not None else 0
+        return (
+            -_timestamp(batch_time),
+            group_id,
+            chunk_sequence,
+            _source_excerpt_position(chunk, version),
+            _timestamp(card.created_at),
+            str(card.id),
+        )
+
+    rows.sort(key=source_order)
+    return [make_card_view(card, version) for card, version, _, _ in rows]
+
+
 def adjacent_draft_id(
     session: Session, *, user_id: uuid.UUID, card_id: uuid.UUID
 ) -> uuid.UUID | None:
-    draft_ids = list(
-        session.scalars(
-            select(Card.id)
-            .where(Card.user_id == user_id, Card.state == CardState.DRAFT)
-            .order_by(Card.created_at.desc(), Card.id)
-        )
-    )
+    draft_ids = [view.card.id for view in draft_card_views(session, user_id=user_id)]
     try:
         position = draft_ids.index(card_id)
     except ValueError:
@@ -212,7 +253,7 @@ def create_card_action(
 @router.get("/cards/drafts", response_class=HTMLResponse)
 def draft_inbox(request: Request, session: SessionDependency) -> HTMLResponse:
     user_id = current_user_id(request, session)
-    cards = card_views_for_state(session, user_id=user_id, card_state=CardState.DRAFT)
+    cards = draft_card_views(session, user_id=user_id)
     return templates.TemplateResponse(
         request=request,
         name="drafts.html",

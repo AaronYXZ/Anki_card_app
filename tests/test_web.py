@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from anki_card_app.card_service import CardContent, create_draft
 from anki_card_app.config import get_settings
 from anki_card_app.models import (
     Card,
@@ -14,6 +15,8 @@ from anki_card_app.models import (
     ReviewLog,
     ReviewSession,
     SchedulingState,
+    SourceChunk,
+    SourceDocument,
     UserAccount,
 )
 
@@ -352,6 +355,59 @@ def test_draft_actions_redirect_to_adjacent_card(client: TestClient, db_session:
     assert rejected.headers["location"] == f"/cards/drafts#card-{cards[1].id}"
     page = client.get("/cards/drafts")
     assert f'id="card-{cards[1].id}"' in page.text
+
+
+def test_imported_drafts_follow_their_original_note_order(
+    client: TestClient, db_session: Session
+) -> None:
+    client.get("/")
+    user_id = get_settings().development_user_id
+    document = SourceDocument(
+        user_id=user_id,
+        relative_path="ordered.md",
+        filename="ordered.md",
+        content_hash="a" * 64,
+        raw_content="Paragraph one.\n\nParagraph two.\n\nParagraph three.",
+    )
+    db_session.add(document)
+    db_session.flush()
+    first_chunk = SourceChunk(
+        source_document_id=document.id,
+        sequence=0,
+        text="Paragraph one.\n\nParagraph two.",
+    )
+    second_chunk = SourceChunk(
+        source_document_id=document.id,
+        sequence=1,
+        text="Paragraph three.",
+    )
+    db_session.add_all([first_chunk, second_chunk])
+    db_session.flush()
+
+    for front, excerpt, chunk in (
+        ("Question from paragraph three", "Paragraph three.", second_chunk),
+        ("Question from paragraph two", "Paragraph two.", first_chunk),
+        ("Question from paragraph one", "Paragraph one.", first_chunk),
+    ):
+        create_draft(
+            db_session,
+            user_id=user_id,
+            card_type=CardType.NORMAL,
+            content=CardContent(front=front, back="Answer"),
+            source_document_id=document.id,
+            source_chunk_id=chunk.id,
+            source_excerpt=excerpt,
+        )
+    db_session.commit()
+
+    page = client.get("/cards/drafts")
+
+    assert page.text.index("Question from paragraph one") < page.text.index(
+        "Question from paragraph two"
+    )
+    assert page.text.index("Question from paragraph two") < page.text.index(
+        "Question from paragraph three"
+    )
 
 
 def test_development_user_is_created_once(client: TestClient, db_session: Session) -> None:

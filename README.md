@@ -22,9 +22,9 @@ Markdown notes
 ```
 
 The current version supports Markdown and ZIP imports, Normal/Cloze/Skeleton Recall cards,
-syntax highlighting, draft approval, approved-card editing, FSRS-6 scheduling, complete JSON
-backup and restore, and PWA installation. All learning-data routes require authentication,
-and every write is protected by CSRF validation.
+syntax highlighting, source-ordered draft review, approved-card editing, FSRS-6 scheduling,
+complete JSON backup and restore, and PWA installation. All learning-data routes require
+authentication, and every write is protected by CSRF validation.
 
 ## Installation and use
 
@@ -294,7 +294,7 @@ node --check src/anki_card_app/static/app.js
 node --check src/anki_card_app/static/service-worker.js
 ```
 
-Current baseline: 110 tests passing with 94.03 percent total coverage.
+Current baseline: 111 tests passing with 94.08 percent total coverage.
 
 ## Known limitations
 
