@@ -177,6 +177,7 @@ def test_approved_cards_page_lists_active_cards_only(
     assert "Created " in page.text
     assert "Version 1" in page.text
     assert 'class="source-card approved-card"' in page.text
+    assert 'class="back-to-top" href="#top"' in page.text
     assert f'href="/cards/{approved.id}"' in page.text
     assert f'href="/cards/{approved.id}/edit"' in page.text
 
