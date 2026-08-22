@@ -54,7 +54,8 @@ kbd { display: inline-block; min-width: 1.5rem; padding: 0.1rem 0.35rem; border:
 .dashboard-metrics { margin-top: 1rem; }
 .metric-note { max-width: 48rem; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
 .card-form, .draft-card, .review-card, .empty-state { margin-top: 2rem; padding: clamp(1.25rem, 4vw, 2.25rem); border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); box-shadow: 0 0.6rem 2rem rgb(44 48 42 / 5%); }
-.draft-card { min-width: 0; max-width: 100%; scroll-margin-top: 1rem; }
+.draft-card, .approved-card { min-width: 0; max-width: 100%; }
+.draft-card { scroll-margin-top: 1rem; }
 .card-form { max-width: 48rem; }
 .card-form label { display: grid; gap: 0.45rem; margin-top: 1.25rem; font-weight: 700; }
 .card-form fieldset { display: flex; gap: 1.25rem; border: 0; padding: 0; }
@@ -139,13 +140,13 @@ textarea:focus, input[type="email"]:focus, input[type="password"]:focus { outlin
 .back-to-top:hover, .back-to-top:focus-visible { background: var(--accent-strong); }
 .back-to-top:focus-visible { outline: 3px solid rgb(36 92 69 / 24%); outline-offset: 3px; }
 
-/* Drafts must remain readable on narrow phones without horizontal panning. */
-.draft-card .markdown-content, .draft-card .source-evidence { min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
-.draft-card .markdown-content a, .draft-card .markdown-content code { overflow-wrap: anywhere; word-break: break-word; }
-.draft-card .markdown-content pre { max-width: 100%; overflow-x: hidden; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
-.draft-card .markdown-content pre code { white-space: inherit; }
-.draft-card .markdown-content table { width: 100%; max-width: 100%; table-layout: fixed; border-collapse: collapse; }
-.draft-card .markdown-content th, .draft-card .markdown-content td { overflow-wrap: anywhere; word-break: break-word; }
+/* Draft and approved cards must remain readable on narrow phones without horizontal panning. */
+.draft-card .markdown-content, .draft-card .source-evidence, .approved-card .markdown-content { min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
+.draft-card .markdown-content a, .draft-card .markdown-content code, .approved-card .markdown-content a, .approved-card .markdown-content code { overflow-wrap: anywhere; word-break: break-word; }
+.draft-card .markdown-content pre, .approved-card .markdown-content pre { max-width: 100%; overflow-x: hidden; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+.draft-card .markdown-content pre code, .approved-card .markdown-content pre code { white-space: inherit; }
+.draft-card .markdown-content table, .approved-card .markdown-content table { width: 100%; max-width: 100%; table-layout: fixed; border-collapse: collapse; }
+.draft-card .markdown-content th, .draft-card .markdown-content td, .approved-card .markdown-content th, .approved-card .markdown-content td { overflow-wrap: anywhere; word-break: break-word; }
 
 @media (max-width: 42rem) {
   .site-header { align-items: flex-start; }

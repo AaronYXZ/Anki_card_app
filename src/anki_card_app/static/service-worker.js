@@ -1,4 +1,4 @@
-const CACHE_NAME = "anki-shell-v8";
+const CACHE_NAME = "anki-shell-v9";
 const SHELL_ASSETS = [
   "/static/app.css",
   "/static/app.js",

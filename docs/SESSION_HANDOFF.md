@@ -13,7 +13,7 @@
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
 | Test baseline | 114 passing, 93.25 percent coverage |
-| Product stage | Mac/iPhone sync, mobile layout, source-ordered drafts, and formula rendering deployed |
+| Product stage | Mac/iPhone sync, draft and approved-card mobile layouts, source-ordered drafts, and formula rendering implemented |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -292,11 +292,11 @@ The app provides a manifest, application icons, standalone display mode, install
 - never intercept or cache POST requests;
 - never promise offline ratings or imports.
 
-Draft cards constrain Markdown content to the phone viewport. Long links,
-identifiers, fenced code, and table cells wrap rather than creating horizontal
-page or card scrolling. Long standalone formulas can scroll inside their bounded
-formula container without widening the page. The shell cache is `anki-shell-v8`
-so installed PWAs refresh the updated stylesheet.
+Draft and approved cards constrain Markdown content to the phone viewport. Long
+links, identifiers, fenced code, and table cells wrap rather than creating
+horizontal page or card scrolling. Long standalone formulas can scroll inside
+their bounded formula container without widening the page. The shell cache is
+`anki-shell-v9` so installed PWAs refresh the updated stylesheet.
 
 Any future offline-write feature requires a synchronization protocol, conflict rules, idempotency, and user-visible pending state. Do not extend the current service worker into offline database writes without that design.
 
