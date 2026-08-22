@@ -21,8 +21,8 @@ Markdown 笔记
 ```
 
 当前版本支持 Markdown/ZIP 导入、Normal/Cloze/Skeleton Recall 卡片、代码高亮、
-按原笔记顺序审核草稿、已批准卡片编辑、FSRS-6 排程、JSON 完整备份与恢复，以及
-PWA 安装。所有学习数据接口都需要登录，写操作使用 CSRF 防护。
+LaTeX 公式显示、按原笔记顺序审核草稿、已批准卡片编辑、FSRS-6 排程、JSON 完整
+备份与恢复，以及 PWA 安装。所有学习数据接口都需要登录，写操作使用 CSRF 防护。
 
 ## 安装和使用
 
@@ -163,7 +163,7 @@ Jinja 页面和少量 JavaScript
 | 数据 | PostgreSQL、SQLAlchemy 2、Alembic | 云端状态和数据库迁移 |
 | 排程 | Py-FSRS、FSRS-6 | 计算下一次复习时间 |
 | AI | OpenAI Responses API、Pydantic structured output | 从笔记生成结构化草稿 |
-| 内容 | markdown-it-py、Pygments | 安全 Markdown 和代码高亮 |
+| 内容 | markdown-it-py、Pygments、latex2mathml | 安全 Markdown、代码高亮和 MathML 公式 |
 | 工程 | uv、Pytest、Ruff、Mypy、coverage | 依赖、测试和静态检查 |
 | 部署 | Railway、Railpack、GitHub | Web 服务、PostgreSQL 和发布 |
 
@@ -250,7 +250,31 @@ volume snapshots 和 PITR。即使开启 Railway 原生备份，仍建议保留 
 | Daily queue | 条件允许时至少 10 Normal 和 3 Skeleton Recall |
 | Skeleton prompt | 只有明确 Markdown 才加粗 |
 | Markdown | 禁止嵌入 raw HTML 和不安全链接 |
+| 数学公式 | 服务端把 LaTeX 转换为经过白名单过滤的 MathML |
 | Offline | 只缓存静态资源，不接受离线写入 |
+
+## Markdown 和数学公式
+
+草稿、已批准卡片和复习卡片使用同一个渲染器。行内公式使用 `$...$`，独立公式使用
+`$$...$$`：
+
+```text
+调整后的值是 $Y_{adj}$。
+
+$$
+Y_{adj} = Y - \theta \cdot (X - \bar{X})
+$$
+```
+
+同时支持 `\(...\)` 和 `\[...\]`。如果整行是包含 LaTeX 命令的公式，即使没有
+分隔符也会自动识别，因此下面的内容也可以正确显示：
+
+```text
+Y_{adj} = Y - \theta \cdot (X - \bar{X})
+```
+
+从笔记导入时会保留已有公式分隔符。AI 生成新公式时会按提示加入分隔符。行内代码
+和 fenced code block 始终按代码显示，不会被误判成公式。
 
 ## 配置
 
@@ -281,7 +305,7 @@ node --check src/anki_card_app/static/app.js
 node --check src/anki_card_app/static/service-worker.js
 ```
 
-当前基线：111 项测试通过，总覆盖率 94.08%。
+当前基线：114 项测试通过，总覆盖率 93.25%。
 
 ## 已知限制
 

@@ -76,12 +76,13 @@ class FakeGenerator:
 
 
 def test_generation_prompt_rejects_example_specific_card_material() -> None:
-    assert PROMPT_VERSION == "anki-v4-markdown-preservation"
+    assert PROMPT_VERSION == "anki-v5-math-rendering"
     assert "supporting context, not as default card material" in CARD_GENERATION_PROMPT
     assert "Never generalize a rule from a single example" in CARD_GENERATION_PROMPT
     assert "Never atomize its incidental details into cards" in CARD_GENERATION_PROMPT
     assert "Preserve useful Markdown from the source" in CARD_GENERATION_PROMPT
     assert "including its original Markdown" in CARD_GENERATION_PROMPT
+    assert "Wrap generated inline LaTeX" in CARD_GENERATION_PROMPT
 
 
 def setup_run(db_session: Session) -> tuple[uuid.UUID, uuid.UUID]:

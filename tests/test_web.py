@@ -247,6 +247,34 @@ def test_manual_markdown_is_preserved_and_rendered_in_draft_and_review(
     assert "<strong>power</strong>" in review.text
 
 
+def test_math_is_rendered_in_drafts_and_approved_cards(
+    client: TestClient, db_session: Session
+) -> None:
+    formula = r"Y_{adj} = Y - \theta \cdot (X - \bar{X})"
+    created = client.post(
+        "/cards/new",
+        data={
+            "card_type": "normal",
+            "front": formula,
+            "back": r"Use $\bar{X}$ as the mean.",
+        },
+        follow_redirects=False,
+    )
+    assert created.status_code == 303
+    card = db_session.scalar(select(Card))
+    assert card is not None
+
+    draft = client.get("/cards/drafts")
+    assert '<div class="math block"><math' in draft.text
+    assert "<msub>" in draft.text
+    assert "<mover>" in draft.text
+
+    client.post(f"/cards/{card.id}/approve", follow_redirects=False)
+    approved = client.get("/cards")
+    assert '<div class="math block"><math' in approved.text
+    assert '<span class="math inline"><math' in approved.text
+
+
 def test_cloze_card_rendering_and_rejection(client: TestClient, db_session: Session) -> None:
     created = client.post(
         "/cards/new",

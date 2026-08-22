@@ -22,9 +22,9 @@ Markdown notes
 ```
 
 The current version supports Markdown and ZIP imports, Normal/Cloze/Skeleton Recall cards,
-syntax highlighting, source-ordered draft review, approved-card editing, FSRS-6 scheduling,
-complete JSON backup and restore, and PWA installation. All learning-data routes require
-authentication, and every write is protected by CSRF validation.
+syntax highlighting, LaTeX formula rendering, source-ordered draft review, approved-card
+editing, FSRS-6 scheduling, complete JSON backup and restore, and PWA installation. All
+learning-data routes require authentication, and every write is protected by CSRF validation.
 
 ## Installation and use
 
@@ -168,7 +168,7 @@ and future clients share the same learning rules.
 | Data | PostgreSQL, SQLAlchemy 2, Alembic | Cloud state and database migrations |
 | Scheduling | Py-FSRS, FSRS-6 | Next-review calculation |
 | AI | OpenAI Responses API, Pydantic structured output | Structured drafts from notes |
-| Content | markdown-it-py, Pygments | Safe Markdown and syntax highlighting |
+| Content | markdown-it-py, Pygments, latex2mathml | Safe Markdown, syntax highlighting, and MathML formulas |
 | Engineering | uv, Pytest, Ruff, Mypy, coverage | Dependencies, tests, and static checks |
 | Deployment | Railway, Railpack, GitHub | Web service, PostgreSQL, and releases |
 
@@ -262,7 +262,32 @@ backups because JSON is easier to migrate to another provider.
 | Daily queue | Targets at least 10 Normal and 3 Skeleton Recall when possible |
 | Skeleton prompt | Bold only when explicitly marked with Markdown |
 | Markdown | Rejects raw HTML and unsafe links |
+| Math | Converts LaTeX to allowlisted MathML on the server |
 | Offline | Caches static resources but rejects offline writes |
+
+## Markdown and formulas
+
+Drafts, approved cards, and review cards use the same renderer. Use `$...$` for an inline
+formula and `$$...$$` for a standalone formula:
+
+```text
+The adjusted value is $Y_{adj}$.
+
+$$
+Y_{adj} = Y - \theta \cdot (X - \bar{X})
+$$
+```
+
+The `\(...\)` and `\[...\]` delimiters are also supported. A standalone line containing
+LaTeX commands is recognized without delimiters, so this line also renders as a formula:
+
+```text
+Y_{adj} = Y - \theta \cdot (X - \bar{X})
+```
+
+Imported notes retain their existing delimiters. AI-generated cards are instructed to wrap
+new formulas in delimiters. Code spans and fenced code blocks remain code and are never
+interpreted as formulas.
 
 ## Configuration
 
@@ -294,7 +319,7 @@ node --check src/anki_card_app/static/app.js
 node --check src/anki_card_app/static/service-worker.js
 ```
 
-Current baseline: 111 tests passing with 94.08 percent total coverage.
+Current baseline: 114 tests passing with 93.25 percent total coverage.
 
 ## Known limitations
 

@@ -12,8 +12,8 @@
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
-| Test baseline | 111 passing, 94.08 percent coverage |
-| Product stage | Mac/iPhone sync, mobile layout, and source-ordered drafts deployed |
+| Test baseline | 114 passing, 93.25 percent coverage |
+| Product stage | Mac/iPhone sync, mobile layout, source-ordered drafts, and formula rendering implemented locally |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -105,7 +105,7 @@ Important modules:
 | `src/anki_card_app/notes_web.py` | Imported-note ledger and note-to-card traceability |
 | `src/anki_card_app/import_service.py` | Safe upload parsing, ZIP limits, Markdown chunking, content hashing |
 | `src/anki_card_app/generation.py` | Prompt, structured OpenAI output, validation, deduplication, progress persistence |
-| `src/anki_card_app/markdown.py` | CommonMark rendering with embedded HTML disabled and Pygments fenced-code highlighting |
+| `src/anki_card_app/markdown.py` | Safe CommonMark, Pygments code highlighting, and server-side LaTeX-to-MathML rendering |
 | `src/anki_card_app/card_service.py` | Card validation, immutable versions, lifecycle transitions |
 | `src/anki_card_app/review_service.py` | Daily queue, reveal rules, idempotent rating transaction |
 | `src/anki_card_app/fsrs_adapter.py` | FSRS state creation, restoration, application, and snapshots |
@@ -211,11 +211,11 @@ Do not violate these invariants:
 12. Password mode never falls back to the fixed development identity.
 13. Raw authentication session tokens are never persisted. Only SHA-256 digests are stored.
 14. Every POST validates a CSRF token derived from the current Session after login.
-15. Ordinary dynamic content is Jinja-autoescaped. Card Markdown is converted by the shared renderer with embedded HTML and unsafe links disabled before templates receive safe markup. Recognized fenced-code languages are highlighted by Pygments.
+15. Ordinary dynamic content is Jinja-autoescaped. Card Markdown is converted by the shared renderer with embedded HTML and unsafe links disabled before templates receive safe markup. Recognized fenced-code languages are highlighted by Pygments. LaTeX is converted on the server and every generated MathML element and attribute must pass a strict allowlist.
 
 ## 8. Generation behavior
 
-The active prompt version is `anki-v4-markdown-preservation`. It treats examples,
+The active prompt version is `anki-v5-math-rendering`. It treats examples,
 cases, scenarios, analogies, anecdotes, sample calculations, and illustrative
 code as supporting context instead of standalone card material. It may test an
 explicitly stated reusable principle, while keeping the example as optional
@@ -224,7 +224,9 @@ Recall card when the source clearly presents the full story as rehearsal materia
 incidental details are not atomized into cards. Every source chunk may return at
 most 20 candidates. The prompt also requires generated fields to retain useful
 source Markdown such as lists, emphasis, links, inline code, fenced code, and math
-notation. Exact source excerpts retain their original Markdown. A candidate is
+notation. Inline formulas use `$...$` and standalone formulas use `$$...$$` so
+drafts and cards can render them consistently. Exact source excerpts retain their
+original Markdown. A candidate is
 accepted only when:
 
 - its Pydantic schema is valid;
@@ -292,8 +294,9 @@ The app provides a manifest, application icons, standalone display mode, install
 
 Draft cards constrain Markdown content to the phone viewport. Long links,
 identifiers, fenced code, and table cells wrap rather than creating horizontal
-page or card scrolling. The shell cache is `anki-shell-v7` so installed PWAs
-refresh the updated stylesheet.
+page or card scrolling. Long standalone formulas can scroll inside their bounded
+formula container without widening the page. The shell cache is `anki-shell-v8`
+so installed PWAs refresh the updated stylesheet.
 
 Any future offline-write feature requires a synchronization protocol, conflict rules, idempotency, and user-visible pending state. Do not extend the current service worker into offline database writes without that design.
 
@@ -312,8 +315,8 @@ node --check src/anki_card_app/static/service-worker.js
 
 At the handoff snapshot:
 
-- 111 tests pass;
-- total branch-aware coverage is 94.08 percent;
+- 114 tests pass;
+- total branch-aware coverage is 93.25 percent;
 - coverage threshold is 90 percent;
 - both PWA icons are valid PNG files at 192 by 192 and 512 by 512;
 - live manifest response type is `application/manifest+json`;

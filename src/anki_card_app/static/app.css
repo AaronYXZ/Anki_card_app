@@ -84,6 +84,10 @@ textarea:focus, input[type="email"]:focus, input[type="password"]:focus { outlin
 .markdown-content pre { overflow-x: auto; padding: 1rem; border-radius: 0.65rem; background: #f2f1eb; font-size: 0.9rem; }
 .markdown-content code { padding: 0.08rem 0.25rem; border-radius: 0.25rem; background: #f2f1eb; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.9em; }
 .markdown-content pre code { padding: 0; background: transparent; }
+.math.inline { display: inline-block; max-width: 100%; vertical-align: middle; }
+.math.block { width: 100%; max-width: 100%; margin: 1rem 0; overflow-x: auto; overflow-y: hidden; }
+.math.block math { display: block; width: max-content; min-width: 100%; }
+.math-error { color: var(--danger); }
 .highlight .c, .highlight .ch, .highlight .cm, .highlight .c1, .highlight .cs { color: #3d6f6f; font-style: italic; }
 .highlight .k, .highlight .kc, .highlight .kd, .highlight .kn, .highlight .kr { color: #18752c; font-weight: 700; }
 .highlight .kp, .highlight .nb, .highlight .bp { color: #18752c; }
