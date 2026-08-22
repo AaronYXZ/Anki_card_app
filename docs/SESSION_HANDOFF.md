@@ -7,13 +7,13 @@
 | Project | Anki Card App |
 | Snapshot date | 2026-08-22 |
 | Branch | `dev` |
-| Live deployment source commit | `4640f38 Fit draft cards to mobile screens` |
+| Live deployment source commit | `d7dc451 Order imported drafts by source position` |
 | Local URL | `http://127.0.0.1:8000` |
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
 | Test baseline | 111 passing, 94.08 percent coverage |
-| Product stage | Mac/iPhone sync and mobile acceptance passed, source-ordered drafts pending deployment |
+| Product stage | Mac/iPhone sync, mobile layout, and source-ordered drafts deployed |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
