@@ -7,13 +7,13 @@
 | Project | Anki Card App |
 | Snapshot date | 2026-08-22 |
 | Branch | `dev` |
-| Live deployment source commit | `d7dc451 Order imported drafts by source position` |
+| Live deployment source commit | `4efe26e Render LaTeX formulas as safe MathML` |
 | Local URL | `http://127.0.0.1:8000` |
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
 | Test baseline | 114 passing, 93.25 percent coverage |
-| Product stage | Mac/iPhone sync, mobile layout, source-ordered drafts, and formula rendering implemented locally |
+| Product stage | Mac/iPhone sync, mobile layout, source-ordered drafts, and formula rendering deployed |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -321,7 +321,7 @@ At the handoff snapshot:
 - both PWA icons are valid PNG files at 192 by 192 and 512 by 512;
 - live manifest response type is `application/manifest+json`;
 - live service-worker response includes `Cache-Control: no-cache` and `Service-Worker-Allowed: /`;
-- Git working tree was clean after commit `6d7f7b8`.
+- Formula-rendering release `4efe26e` passed Railway health checks and production asset verification.
 
 Tests use an isolated SQLite database through fixtures. Production-like PostgreSQL constraints and deployment behavior still need dedicated acceptance testing.
 
