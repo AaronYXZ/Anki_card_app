@@ -198,6 +198,10 @@ An `attempt_id` prevents a network retry from recording the same rating twice. T
 version does not have IndexedDB offline writes, conflict resolution, or background sync. Do
 not continue reviewing while offline.
 
+Daily review totals reset at midnight in `America/Los_Angeles`. The IANA timezone handles
+Pacific Daylight Time, UTC-7, and Pacific Standard Time, UTC-8, automatically. Database
+timestamps remain stored in UTC.
+
 See [Railway Deployment and Sync Acceptance](docs/RAILWAY_DEPLOYMENT.md) for the deployment
 and acceptance runbook.
 
@@ -319,7 +323,7 @@ node --check src/anki_card_app/static/app.js
 node --check src/anki_card_app/static/service-worker.js
 ```
 
-Current baseline: 114 tests passing with 93.25 percent total coverage.
+Current baseline: 115 tests passing with 93.25 percent total coverage.
 
 ## Known limitations
 

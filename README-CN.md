@@ -191,6 +191,9 @@ Session，因此在一个设备退出不会自动让另一个设备退出。
 保证网络重试不会重复记录同一次评分。当前没有 IndexedDB 离线写入、冲突合并或
 后台同步，断网时不要继续复习。
 
+每日复习统计按 `America/Los_Angeles` 的午夜重置。IANA 时区会自动处理太平洋
+夏令时 UTC-7 和冬令时 UTC-8。数据库时间戳仍统一保存为 UTC。
+
 详细部署和验收步骤见
 [Railway Deployment and Sync Acceptance](docs/RAILWAY_DEPLOYMENT.md)。
 
@@ -305,7 +308,7 @@ node --check src/anki_card_app/static/app.js
 node --check src/anki_card_app/static/service-worker.js
 ```
 
-当前基线：114 项测试通过，总覆盖率 93.25%。
+当前基线：115 项测试通过，总覆盖率 93.25%。
 
 ## 已知限制
 

@@ -13,3 +13,4 @@ def test_ensure_user_is_idempotent(db_session: Session) -> None:
 
     assert created is existing
     assert existing.email == "learner@example.com"
+    assert existing.timezone == "America/Los_Angeles"

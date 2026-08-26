@@ -95,7 +95,7 @@ class UserAccount(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     password_hash: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(default=True)
-    timezone: Mapped[str] = mapped_column(String(64), default="UTC")
+    timezone: Mapped[str] = mapped_column(String(64), default="America/Los_Angeles")
     daily_limit: Mapped[int] = mapped_column(Integer, default=25)
     desired_retention: Mapped[float] = mapped_column(Float, default=0.9)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

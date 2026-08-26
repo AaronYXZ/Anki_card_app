@@ -12,7 +12,7 @@
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260810_0006` |
-| Test baseline | 114 passing, 93.25 percent coverage |
+| Test baseline | 115 passing, 93.25 percent coverage |
 | Product stage | Mac/iPhone sync, draft and approved-card mobile layouts, source-ordered drafts, and formula rendering deployed |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
@@ -207,7 +207,7 @@ Do not violate these invariants:
 8. Scheduling-state update and review-log insertion occur in one transaction.
 9. `ReviewLog.attempt_id` is globally unique and makes submission idempotent.
 10. Review logs and prior or new FSRS snapshots are append-only history.
-11. Stored timestamps are UTC. User timezone affects local-day boundaries and presentation.
+11. Stored timestamps are UTC. User timezone affects local-day boundaries and presentation. New accounts default to `America/Los_Angeles`, which automatically switches between UTC-7 and UTC-8.
 12. Password mode never falls back to the fixed development identity.
 13. Raw authentication session tokens are never persisted. Only SHA-256 digests are stored.
 14. Every POST validates a CSRF token derived from the current Session after login.
@@ -315,7 +315,7 @@ node --check src/anki_card_app/static/service-worker.js
 
 At the handoff snapshot:
 
-- 114 tests pass;
+- 115 tests pass;
 - total branch-aware coverage is 93.25 percent;
 - coverage threshold is 90 percent;
 - both PWA icons are valid PNG files at 192 by 192 and 512 by 512;
