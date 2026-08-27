@@ -7,13 +7,13 @@
 | Project | Anki Card App |
 | Snapshot date | 2026-08-27 |
 | Branch | `dev` |
-| Live deployment source commit | `44ce0aa Compact mobile navigation header` |
+| Live deployment source commit | `a3db5a6 Add newest-first favorites library` |
 | Local URL | `http://127.0.0.1:8000` |
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260827_0008` |
 | Test baseline | 118 passing, 93.24 percent coverage |
-| Product stage | Mac/iPhone sync, compact mobile navigation, mobile cards, source-ordered drafts, formula rendering, and a newest-first favorites library implemented |
+| Product stage | Mac/iPhone sync, compact mobile navigation, mobile cards, source-ordered drafts, formula rendering, and a newest-first favorites library deployed |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -334,6 +334,7 @@ At the handoff snapshot:
 - The compact mobile header was checked at 402 by 874 CSS pixels: all five navigation controls shared the same top coordinate, header height was 87 pixels, page scroll width equaled viewport width, and opening Create did not change header height.
 - Release `44ce0aa` deployed the compact mobile header. Railway reported success, `/ready` returned ready, and production served `anki-shell-v11` with the new horizontal mobile navigation rules.
 - The Favorites library passed 118 tests and a local PostgreSQL migration to `20260827_0008`. At 402 by 874 CSS pixels, the header remained about 87 pixels high, the Favorites heart was visible beside the brand, navigation reached `/favorites`, and page width stayed at 402 pixels without horizontal overflow.
+- Release `a3db5a6` deployed the Favorites library through migration `20260827_0008`. Railway reported success, `/ready` returned ready, production served `anki-shell-v12`, and unauthenticated `/favorites` access redirected to login.
 
 Tests use an isolated SQLite database through fixtures. Production-like PostgreSQL constraints and deployment behavior still need dedicated acceptance testing.
 
