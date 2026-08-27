@@ -21,8 +21,9 @@ Markdown 笔记
 ```
 
 当前版本支持 Markdown/ZIP 导入、Normal/Cloze/Skeleton Recall 卡片、代码高亮、
-LaTeX 公式显示、按原笔记顺序审核草稿、已批准卡片编辑、FSRS-6 排程、JSON 完整
-备份与恢复，以及 PWA 安装。所有学习数据接口都需要登录，写操作使用 CSRF 防护。
+LaTeX 公式显示、按原笔记顺序审核草稿、已批准卡片编辑、持久化卡片收藏、FSRS-6
+排程、JSON 完整备份与恢复，以及 PWA 安装。所有学习数据接口都需要登录，写操作
+使用 CSRF 防护。
 
 ## 安装和使用
 
@@ -250,6 +251,7 @@ volume snapshots 和 PITR。即使开启 Railway 原生备份，仍建议保留 
 | AI 生成 | 只生成草稿，不自动进入复习 |
 | Review history | Append-only，不覆盖历史评分 |
 | Card edits | 新增不可变 CardVersion |
+| 收藏 | 保存在 Card 上，并在已登录设备之间同步 |
 | Daily queue | 条件允许时至少 10 Normal 和 3 Skeleton Recall |
 | Skeleton prompt | 只有明确 Markdown 才加粗 |
 | Markdown | 禁止嵌入 raw HTML 和不安全链接 |
@@ -308,7 +310,7 @@ node --check src/anki_card_app/static/app.js
 node --check src/anki_card_app/static/service-worker.js
 ```
 
-当前基线：115 项测试通过，总覆盖率 93.25%。
+当前基线：117 项测试通过，总覆盖率 93.19%。
 
 ## 已知限制
 

@@ -101,7 +101,11 @@ textarea:focus, input[type="email"]:focus, input[type="password"]:focus { outlin
 .markdown-content blockquote, .source-markdown { margin-left: 0; padding-left: 1rem; border-left: 3px solid var(--line); }
 .markdown-content li + li { margin-top: 0.35rem; }
 .enrichment { margin-top: 1rem; }
-.review-card { max-width: 48rem; min-height: 20rem; }
+.review-card { position: relative; max-width: 48rem; min-height: 20rem; }
+.favorite-form { position: absolute; top: 1rem; right: 1rem; margin: 0; }
+.favorite-button { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; min-height: 2.75rem; padding: 0; border: 1px solid var(--line); border-radius: 999px; background: white; font-size: 1.35rem; filter: grayscale(1); opacity: 0.5; cursor: pointer; }
+.favorite-button.active { border-color: #d9958f; filter: none; opacity: 1; }
+.favorite-button:focus-visible { outline: 3px solid rgb(159 48 40 / 22%); outline-offset: 2px; }
 .review-card details summary { width: fit-content; list-style: none; }
 .review-card details summary::-webkit-details-marker { display: none; }
 .revealed-answer { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--line); color: var(--ink); }

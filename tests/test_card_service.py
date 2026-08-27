@@ -18,6 +18,7 @@ from anki_card_app.card_service import (
     reject_card,
     resume_card,
     retire_card,
+    set_card_favorite,
     suspend_card,
     validate_content,
 )
@@ -106,6 +107,35 @@ def test_create_and_edit_card_preserves_versions(db_session: Session, user_id: u
     assert replacement.version_number == 2
     assert card.current_version_id == replacement.id
     assert version_count == 2
+
+
+def test_card_favorite_is_persistent_idempotent_and_user_scoped(
+    db_session: Session, user_id: uuid.UUID
+) -> None:
+    card = create_normal_draft(db_session, user_id)
+
+    set_card_favorite(
+        db_session,
+        user_id=user_id,
+        card_id=card.id,
+        is_favorite=True,
+    )
+    set_card_favorite(
+        db_session,
+        user_id=user_id,
+        card_id=card.id,
+        is_favorite=True,
+    )
+    db_session.commit()
+
+    assert card.is_favorite is True
+    with pytest.raises(CardNotFoundError):
+        set_card_favorite(
+            db_session,
+            user_id=uuid.uuid4(),
+            card_id=card.id,
+            is_favorite=False,
+        )
 
 
 def test_create_and_edit_reject_exact_duplicates(db_session: Session, user_id: uuid.UUID) -> None:

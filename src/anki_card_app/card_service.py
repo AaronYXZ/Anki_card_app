@@ -109,6 +109,20 @@ def get_current_version(session: Session, card: Card) -> CardVersion:
     return version
 
 
+def set_card_favorite(
+    session: Session,
+    *,
+    user_id: uuid.UUID,
+    card_id: uuid.UUID,
+    is_favorite: bool,
+) -> Card:
+    card = get_owned_card(session, user_id=user_id, card_id=card_id)
+    card.is_favorite = is_favorite
+    card.updated_at = utc_now()
+    session.flush()
+    return card
+
+
 def create_draft(
     session: Session,
     *,

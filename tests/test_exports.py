@@ -52,6 +52,8 @@ def test_authenticated_backup_contains_complete_owned_history(
     card = db_session.scalar(select(Card).where(Card.user_id == owner_id))
     assert card is not None
     client.post(f"/cards/{card.id}/approve")
+    card.is_favorite = True
+    db_session.commit()
     client.get("/review")
     review_session = db_session.scalar(
         select(ReviewSession).where(ReviewSession.user_id == owner_id)
@@ -75,6 +77,7 @@ def test_authenticated_backup_contains_complete_owned_history(
     assert payload["format"] == "anki-card-app-backup"
     assert payload["format_version"] == 1
     assert payload["user"]["id"] == str(owner_id)
+    assert payload["data"]["cards"][0]["is_favorite"] is True
     for table in (
         "source_documents",
         "source_chunks",

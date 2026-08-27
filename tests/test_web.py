@@ -138,7 +138,25 @@ def test_normal_card_create_edit_approve_and_review(
     assert "Again" in revealed_page.text
     assert 'data-shortcut="1"' in revealed_page.text
     assert 'data-shortcut="4"' in revealed_page.text
-    attempt_match = re.search(r'name="attempt_id" value="([^"]+)"', revealed_page.text)
+    assert 'aria-label="Add to favorites"' in revealed_page.text
+    assert 'aria-pressed="false"' in revealed_page.text
+
+    favorited = client.post(
+        f"/cards/{card.id}/favorite",
+        data={"favorite": "true"},
+        follow_redirects=False,
+    )
+    assert favorited.status_code == 303
+    assert favorited.headers["location"] == "/review"
+    db_session.refresh(card)
+    assert card.is_favorite is True
+
+    favorite_page = client.get("/review")
+    assert 'class="favorite-button active"' in favorite_page.text
+    assert 'aria-label="Remove from favorites"' in favorite_page.text
+    assert 'aria-pressed="true"' in favorite_page.text
+    assert "Again" in favorite_page.text
+    attempt_match = re.search(r'name="attempt_id" value="([^"]+)"', favorite_page.text)
     assert attempt_match is not None
 
     rated = client.post(

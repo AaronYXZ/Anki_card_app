@@ -206,6 +206,7 @@ class Card(Base):
     content_fingerprint: Mapped[str | None] = mapped_column(String(64))
     card_type: Mapped[CardType] = mapped_column(card_type_enum)
     state: Mapped[CardState] = mapped_column(card_state_enum, default=CardState.DRAFT, index=True)
+    is_favorite: Mapped[bool] = mapped_column(default=False)
     current_version_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey(
             "card_versions.id",

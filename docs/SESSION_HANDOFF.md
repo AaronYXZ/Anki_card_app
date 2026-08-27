@@ -11,9 +11,9 @@
 | Local URL | `http://127.0.0.1:8000` |
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
-| Schema head | `20260810_0006` |
-| Test baseline | 115 passing, 93.25 percent coverage |
-| Product stage | Mac/iPhone sync, draft and approved-card mobile layouts, source-ordered drafts, and formula rendering deployed |
+| Schema head | `20260827_0007` |
+| Test baseline | 117 passing, 93.19 percent coverage |
+| Product stage | Mac/iPhone sync, mobile layouts, source-ordered drafts, formula rendering, and card favorites implemented locally |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -212,6 +212,7 @@ Do not violate these invariants:
 13. Raw authentication session tokens are never persisted. Only SHA-256 digests are stored.
 14. Every POST validates a CSRF token derived from the current Session after login.
 15. Ordinary dynamic content is Jinja-autoescaped. Card Markdown is converted by the shared renderer with embedded HTML and unsafe links disabled before templates receive safe markup. Recognized fenced-code languages are highlighted by Pygments. LaTeX is converted on the server and every generated MathML element and attribute must pass a strict allowlist.
+16. Card favorites are user-owned persistent Card metadata. Toggling a favorite does not alter the review session, rating, or FSRS schedule. JSON backups preserve favorites, while older version 1 backups default missing favorite fields to false.
 
 ## 8. Generation behavior
 
@@ -280,6 +281,8 @@ Rating mapping:
 | `3` | Good | Recalled after hesitation |
 | `4` | Easy | Recalled immediately |
 
+After revealing an answer, the review card shows an accessible heart control in its upper-right corner. The POST action sets the desired favorite value idempotently and returns to the same revealed review card without recording a rating.
+
 The north-star metric implemented on the dashboard is 30-day first-attempt recall for due reviews. Hard, Good, and Easy count as successful recall. Again counts as failure. Same-day attempts after the first attempt for the same card are excluded.
 
 ## 10. PWA behavior
@@ -315,8 +318,8 @@ node --check src/anki_card_app/static/service-worker.js
 
 At the handoff snapshot:
 
-- 115 tests pass;
-- total branch-aware coverage is 93.25 percent;
+- 117 tests pass;
+- total branch-aware coverage is 93.19 percent;
 - coverage threshold is 90 percent;
 - both PWA icons are valid PNG files at 192 by 192 and 512 by 512;
 - live manifest response type is `application/manifest+json`;

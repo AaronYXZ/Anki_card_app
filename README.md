@@ -23,8 +23,9 @@ Markdown notes
 
 The current version supports Markdown and ZIP imports, Normal/Cloze/Skeleton Recall cards,
 syntax highlighting, LaTeX formula rendering, source-ordered draft review, approved-card
-editing, FSRS-6 scheduling, complete JSON backup and restore, and PWA installation. All
-learning-data routes require authentication, and every write is protected by CSRF validation.
+editing, persistent card favorites, FSRS-6 scheduling, complete JSON backup and restore,
+and PWA installation. All learning-data routes require authentication, and every write is
+protected by CSRF validation.
 
 ## Installation and use
 
@@ -263,6 +264,7 @@ backups because JSON is easier to migrate to another provider.
 | AI generation | Produces drafts only and never enters review automatically |
 | Review history | Append-only, with no overwritten historical ratings |
 | Card edits | Append an immutable CardVersion |
+| Favorites | Persist on the Card and synchronize across signed-in devices |
 | Daily queue | Targets at least 10 Normal and 3 Skeleton Recall when possible |
 | Skeleton prompt | Bold only when explicitly marked with Markdown |
 | Markdown | Rejects raw HTML and unsafe links |
@@ -323,7 +325,7 @@ node --check src/anki_card_app/static/app.js
 node --check src/anki_card_app/static/service-worker.js
 ```
 
-Current baseline: 115 tests passing with 93.25 percent total coverage.
+Current baseline: 117 tests passing with 93.19 percent total coverage.
 
 ## Known limitations
 

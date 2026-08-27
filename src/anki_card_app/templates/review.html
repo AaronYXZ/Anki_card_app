@@ -11,6 +11,11 @@
       <span class="pill">{{ card_view.card.card_type.value }}</span>
       <div class="markdown-content card-prompt{% if card_view.card.card_type.value == 'skeleton_recall' %} skeleton-prompt{% endif %}">{{ card_view.prompt|markdown }}</div>
       {% if entry.item.revealed_at %}
+        <form class="favorite-form" action="/cards/{{ entry.card.id }}/favorite" method="post">
+          <input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}">
+          <input type="hidden" name="favorite" value="{{ 'false' if entry.card.is_favorite else 'true' }}">
+          <button class="favorite-button{% if entry.card.is_favorite %} active{% endif %}" type="submit" aria-label="{{ 'Remove from favorites' if entry.card.is_favorite else 'Add to favorites' }}" aria-pressed="{{ 'true' if entry.card.is_favorite else 'false' }}" title="{{ 'Remove from favorites' if entry.card.is_favorite else 'Add to favorites' }}">&#10084;&#65039;</button>
+        </form>
         <div class="markdown-content revealed-answer">{{ card_view.answer|markdown }}</div>
         <div class="rating-grid" aria-label="Recall rating">
           {% for value, label, meaning in [(1, "Again", "Could not recall"), (2, "Hard", "Serious difficulty"), (3, "Good", "Some hesitation"), (4, "Easy", "Immediate recall")] %}

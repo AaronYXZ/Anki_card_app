@@ -27,6 +27,7 @@ from anki_card_app.card_service import (
     get_current_version,
     get_owned_card,
     reject_card,
+    set_card_favorite,
 )
 from anki_card_app.database import get_session
 from anki_card_app.markdown import render_markdown
@@ -389,6 +390,28 @@ def reject_card_action(
         session.rollback()
         raise_http_card_error(error)
     return RedirectResponse(draft_destination(next_card_id), status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/cards/{card_id}/favorite", dependencies=[Depends(validate_csrf)])
+def favorite_card_action(
+    request: Request,
+    card_id: uuid.UUID,
+    favorite: Annotated[bool, Form()],
+    session: SessionDependency,
+) -> RedirectResponse:
+    user_id = current_user_id(request, session)
+    try:
+        set_card_favorite(
+            session,
+            user_id=user_id,
+            card_id=card_id,
+            is_favorite=favorite,
+        )
+        session.commit()
+    except CardError as error:
+        session.rollback()
+        raise_http_card_error(error)
+    return RedirectResponse("/review", status_code=status.HTTP_303_SEE_OTHER)
 
 
 def raise_http_review_error(error: ReviewError) -> NoReturn:
