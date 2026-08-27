@@ -7,13 +7,13 @@
 | Project | Anki Card App |
 | Snapshot date | 2026-08-27 |
 | Branch | `dev` |
-| Live deployment source commit | `b4b3f29 Add persistent favorites to review cards` |
+| Live deployment source commit | `44ce0aa Compact mobile navigation header` |
 | Local URL | `http://127.0.0.1:8000` |
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260827_0007` |
 | Test baseline | 117 passing, 93.19 percent coverage |
-| Product stage | Mac/iPhone sync, compact mobile navigation, mobile cards, source-ordered drafts, formula rendering, and favorites implemented |
+| Product stage | Mac/iPhone sync, compact mobile navigation, mobile cards, source-ordered drafts, formula rendering, and favorites deployed |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -331,6 +331,7 @@ At the handoff snapshot:
 - Production account timezone was corrected from `UTC` to `America/Los_Angeles` on 2026-08-25. Release `90999cd` makes Pacific time the new-account default and tests both UTC-7 summer and UTC-8 winter day boundaries.
 - Release `b4b3f29` deployed persistent review-card favorites through migration `20260827_0007`; production health, schema head, and `anki-shell-v10` assets were verified.
 - The compact mobile header was checked at 402 by 874 CSS pixels: all five navigation controls shared the same top coordinate, header height was 87 pixels, page scroll width equaled viewport width, and opening Create did not change header height.
+- Release `44ce0aa` deployed the compact mobile header. Railway reported success, `/ready` returned ready, and production served `anki-shell-v11` with the new horizontal mobile navigation rules.
 
 Tests use an isolated SQLite database through fixtures. Production-like PostgreSQL constraints and deployment behavior still need dedicated acceptance testing.
 
