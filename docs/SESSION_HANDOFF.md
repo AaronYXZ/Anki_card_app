@@ -11,9 +11,9 @@
 | Local URL | `http://127.0.0.1:8000` |
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
-| Schema head | `20260827_0007` |
-| Test baseline | 117 passing, 93.19 percent coverage |
-| Product stage | Mac/iPhone sync, compact mobile navigation, mobile cards, source-ordered drafts, formula rendering, and favorites deployed |
+| Schema head | `20260827_0008` |
+| Test baseline | 118 passing, 93.24 percent coverage |
+| Product stage | Mac/iPhone sync, compact mobile navigation, mobile cards, source-ordered drafts, formula rendering, and a newest-first favorites library implemented |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -159,6 +159,7 @@ rejected unless `AUTH_MODE=password` and `SESSION_COOKIE_SECURE=true`. See
 | `/notes/{document_id}` | GET | Source metadata and extracted cards |
 | `/cards/new` | GET, POST | Manual card creation |
 | `/cards` | GET | Browse and edit approved active cards |
+| `/favorites` | GET | Browse the current user's favorite cards by newest favorite timestamp |
 | `/cards/{card_id}` | GET | Review-format card preview without scheduling or history side effects |
 | `/cards/drafts` | GET | Draft review inbox with a floating back-to-top control |
 | `/cards/{card_id}/edit` | GET, POST | Versioned content editing |
@@ -212,7 +213,7 @@ Do not violate these invariants:
 13. Raw authentication session tokens are never persisted. Only SHA-256 digests are stored.
 14. Every POST validates a CSRF token derived from the current Session after login.
 15. Ordinary dynamic content is Jinja-autoescaped. Card Markdown is converted by the shared renderer with embedded HTML and unsafe links disabled before templates receive safe markup. Recognized fenced-code languages are highlighted by Pygments. LaTeX is converted on the server and every generated MathML element and attribute must pass a strict allowlist.
-16. Card favorites are user-owned persistent Card metadata. Toggling a favorite does not alter the review session, rating, or FSRS schedule. JSON backups preserve favorites, while older version 1 backups default missing favorite fields to false.
+16. Card favorites are user-owned persistent Card metadata. The first false-to-true transition records `favorited_at`; idempotent repeats preserve that timestamp, while unfavoriting clears it. Toggling a favorite does not alter the review session, rating, or FSRS schedule. JSON backups preserve favorites and timestamps. Older version 1 backups default missing favorite fields to false and backfill a missing timestamp for an existing favorite from `updated_at`.
 
 ## 8. Generation behavior
 
@@ -281,7 +282,7 @@ Rating mapping:
 | `3` | Good | Recalled after hesitation |
 | `4` | Easy | Recalled immediately |
 
-After revealing an answer, the review card shows an accessible heart control in its upper-right corner. The POST action sets the desired favorite value idempotently and returns to the same revealed review card without recording a rating.
+After revealing an answer, the review card shows an accessible heart control in its upper-right corner. The POST action sets the desired favorite value idempotently and returns to the same revealed review card without recording a rating. The header heart opens `/favorites`, which lists only the current user's saved cards with the newest `favorited_at` first.
 
 The north-star metric implemented on the dashboard is 30-day first-attempt recall for due reviews. Hard, Good, and Easy count as successful recall. Again counts as failure. Same-day attempts after the first attempt for the same card are excluded.
 
@@ -299,10 +300,10 @@ Draft and approved cards constrain Markdown content to the phone viewport. Long
 links, identifiers, fenced code, and table cells wrap rather than creating
 horizontal page or card scrolling. Long standalone formulas can scroll inside
 their bounded formula container without widening the page. The shell cache is
-`anki-shell-v11` so installed PWAs refresh the updated stylesheet. At phone
-widths, the brand occupies a compact first row and all five primary controls
-share one horizontal second row. Dropdown panels are absolutely positioned and
-do not increase header height.
+`anki-shell-v12` so installed PWAs refresh the updated stylesheet. At phone
+widths, the brand and Favorites heart share a compact first row and all five
+primary controls share one horizontal second row. Dropdown panels are absolutely
+positioned and do not increase header height.
 
 Any future offline-write feature requires a synchronization protocol, conflict rules, idempotency, and user-visible pending state. Do not extend the current service worker into offline database writes without that design.
 
@@ -321,8 +322,8 @@ node --check src/anki_card_app/static/service-worker.js
 
 At the handoff snapshot:
 
-- 117 tests pass;
-- total branch-aware coverage is 93.19 percent;
+- 118 tests pass;
+- total branch-aware coverage is 93.24 percent;
 - coverage threshold is 90 percent;
 - both PWA icons are valid PNG files at 192 by 192 and 512 by 512;
 - live manifest response type is `application/manifest+json`;
@@ -332,6 +333,7 @@ At the handoff snapshot:
 - Release `b4b3f29` deployed persistent review-card favorites through migration `20260827_0007`; production health, schema head, and `anki-shell-v10` assets were verified.
 - The compact mobile header was checked at 402 by 874 CSS pixels: all five navigation controls shared the same top coordinate, header height was 87 pixels, page scroll width equaled viewport width, and opening Create did not change header height.
 - Release `44ce0aa` deployed the compact mobile header. Railway reported success, `/ready` returned ready, and production served `anki-shell-v11` with the new horizontal mobile navigation rules.
+- The Favorites library passed 118 tests and a local PostgreSQL migration to `20260827_0008`. At 402 by 874 CSS pixels, the header remained about 87 pixels high, the Favorites heart was visible beside the brand, navigation reached `/favorites`, and page width stayed at 402 pixels without horizontal overflow.
 
 Tests use an isolated SQLite database through fixtures. Production-like PostgreSQL constraints and deployment behavior still need dedicated acceptance testing.
 

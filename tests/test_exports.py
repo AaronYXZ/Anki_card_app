@@ -53,6 +53,7 @@ def test_authenticated_backup_contains_complete_owned_history(
     assert card is not None
     client.post(f"/cards/{card.id}/approve")
     card.is_favorite = True
+    card.favorited_at = card.updated_at
     db_session.commit()
     client.get("/review")
     review_session = db_session.scalar(
@@ -78,6 +79,7 @@ def test_authenticated_backup_contains_complete_owned_history(
     assert payload["format_version"] == 1
     assert payload["user"]["id"] == str(owner_id)
     assert payload["data"]["cards"][0]["is_favorite"] is True
+    assert payload["data"]["cards"][0]["favorited_at"] is not None
     for table in (
         "source_documents",
         "source_chunks",

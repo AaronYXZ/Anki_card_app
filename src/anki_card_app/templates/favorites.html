@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Favorites · Anki Card App{% endblock %}
+{% block content %}
+  <section class="page-heading">
+    <p class="eyebrow">Saved cards</p>
+    <h1>Favorites ❤️</h1>
+    <p>Your favorite cards, newest saved first.</p>
+  </section>
+  {% if cards %}
+    <div class="card-list">
+      {% for item in cards %}
+        <article class="source-card approved-card">
+          <div class="card-meta"><span class="pill">{{ item.card.card_type.value }}</span><span class="pill status-{{ item.card.state.value }}">{{ item.card.state.value }}</span><span>Favorited {{ item.card.favorited_at.strftime("%Y-%m-%d %H:%M") if item.card.favorited_at else "previously" }}</span></div>
+          <div class="markdown-content card-prompt{% if item.card.card_type.value == 'skeleton_recall' %} skeleton-prompt{% endif %}">{{ item.prompt|markdown }}</div>
+          <div class="markdown-content answer-preview">{{ item.answer|markdown }}</div>
+          <div class="actions"><a class="button" href="/cards/{{ item.card.id }}">Preview</a><a class="button" href="/cards/{{ item.card.id }}/edit">Edit</a></div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state"><h2>No favorite cards</h2><p>Tap the heart on a revealed review card to save it here.</p><a class="button" href="/review">Open review</a></div>
+  {% endif %}
+  <a class="back-to-top" href="#top" aria-label="Back to top">&#8593; Top</a>
+{% endblock %}

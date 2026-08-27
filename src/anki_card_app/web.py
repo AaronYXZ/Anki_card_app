@@ -101,6 +101,16 @@ def card_views_for_state(
     return [make_card_view(card, version) for card, version in rows]
 
 
+def favorite_card_views(session: Session, *, user_id: uuid.UUID) -> list[CardView]:
+    rows = session.execute(
+        select(Card, CardVersion)
+        .join(CardVersion, CardVersion.id == Card.current_version_id)
+        .where(Card.user_id == user_id, Card.is_favorite.is_(True))
+        .order_by(Card.favorited_at.desc(), Card.id)
+    ).all()
+    return [make_card_view(card, version) for card, version in rows]
+
+
 def _timestamp(value: datetime) -> float:
     normalized = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
     return normalized.timestamp()
@@ -269,6 +279,17 @@ def approved_cards(request: Request, session: SessionDependency) -> HTMLResponse
     return templates.TemplateResponse(
         request=request,
         name="cards.html",
+        context={"cards": cards},
+    )
+
+
+@router.get("/favorites", response_class=HTMLResponse)
+def favorite_cards(request: Request, session: SessionDependency) -> HTMLResponse:
+    user_id = current_user_id(request, session)
+    cards = favorite_card_views(session, user_id=user_id)
+    return templates.TemplateResponse(
+        request=request,
+        name="favorites.html",
         context={"cards": cards},
     )
 

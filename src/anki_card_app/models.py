@@ -207,6 +207,7 @@ class Card(Base):
     card_type: Mapped[CardType] = mapped_column(card_type_enum)
     state: Mapped[CardState] = mapped_column(card_state_enum, default=CardState.DRAFT, index=True)
     is_favorite: Mapped[bool] = mapped_column(default=False)
+    favorited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     current_version_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey(
             "card_versions.id",

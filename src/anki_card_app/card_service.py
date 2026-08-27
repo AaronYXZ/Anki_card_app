@@ -117,8 +117,12 @@ def set_card_favorite(
     is_favorite: bool,
 ) -> Card:
     card = get_owned_card(session, user_id=user_id, card_id=card_id)
+    if card.is_favorite == is_favorite:
+        return card
     card.is_favorite = is_favorite
-    card.updated_at = utc_now()
+    changed_at = utc_now()
+    card.favorited_at = changed_at if is_favorite else None
+    card.updated_at = changed_at
     session.flush()
     return card
 

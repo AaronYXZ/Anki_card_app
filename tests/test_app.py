@@ -46,7 +46,7 @@ def test_pwa_resources_are_served_from_root_scope() -> None:
     assert service_worker.status_code == 200
     assert service_worker.headers["service-worker-allowed"] == "/"
     assert "no-cache" in service_worker.headers["cache-control"]
-    assert 'CACHE_NAME = "anki-shell-v11"' in service_worker.text
+    assert 'CACHE_NAME = "anki-shell-v12"' in service_worker.text
     assert 'request.method !== "GET"' in service_worker.text
     assert 'caches.match("/static/offline.html")' in service_worker.text
     assert styles.status_code == 200
@@ -60,6 +60,7 @@ def test_pwa_resources_are_served_from_root_scope() -> None:
     assert ".approved-card .markdown-content table" in styles.text
     assert ".math.block" in styles.text
     assert ".favorite-button.active" in styles.text
+    assert ".favorite-nav-link" in styles.text
     assert "grid-template-columns: minmax(0, 1fr)" in styles.text
     assert "flex-direction: row" in styles.text
     assert "justify-content: space-between" in styles.text

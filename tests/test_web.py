@@ -1,5 +1,6 @@
 import re
 import uuid
+from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
@@ -63,7 +64,62 @@ def test_primary_navigation_is_grouped_into_four_categories(client: TestClient) 
     assert '<a href="/exports/backup.json">Export</a>' in page.text
     assert '<a href="/install">Install</a>' in page.text
     assert '<a href="/restore">Restore</a>' in page.text
+    assert '<a class="nav-link favorite-nav-link" href="/favorites"' in page.text
+    assert 'aria-label="Favorites"' in page.text
     assert ">Sign out</button>" in page.text
+
+
+def test_favorites_page_is_user_scoped_and_newest_first(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    client.get("/")
+    owner_id = get_settings().development_user_id
+    older = create_draft(
+        db_session,
+        user_id=owner_id,
+        card_type=CardType.NORMAL,
+        content=CardContent(front="Older favorite", back="Older answer"),
+    )
+    newer = create_draft(
+        db_session,
+        user_id=owner_id,
+        card_type=CardType.NORMAL,
+        content=CardContent(front="Newer favorite", back="Newer answer"),
+    )
+    hidden = create_draft(
+        db_session,
+        user_id=owner_id,
+        card_type=CardType.NORMAL,
+        content=CardContent(front="Not a favorite", back="Hidden answer"),
+    )
+    other_user = UserAccount(email="favorite-other@example.com")
+    db_session.add(other_user)
+    db_session.flush()
+    other = create_draft(
+        db_session,
+        user_id=other_user.id,
+        card_type=CardType.NORMAL,
+        content=CardContent(front="Other user's favorite", back="Private"),
+    )
+    older.is_favorite = True
+    older.favorited_at = datetime(2026, 8, 26, 12, tzinfo=UTC)
+    newer.is_favorite = True
+    newer.favorited_at = datetime(2026, 8, 27, 12, tzinfo=UTC)
+    other.is_favorite = True
+    other.favorited_at = datetime(2026, 8, 27, 13, tzinfo=UTC)
+    db_session.commit()
+
+    page = client.get("/favorites")
+
+    assert page.status_code == 200
+    assert "Favorites ❤️" in page.text
+    assert page.text.index("Newer favorite") < page.text.index("Older favorite")
+    assert "Not a favorite" not in page.text
+    assert "Other user's favorite" not in page.text
+    assert f'href="/cards/{newer.id}"' in page.text
+    assert f'href="/cards/{newer.id}/edit"' in page.text
+    assert hidden.is_favorite is False
 
 
 def test_normal_card_create_edit_approve_and_review(

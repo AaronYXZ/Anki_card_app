@@ -120,6 +120,7 @@ def test_card_favorite_is_persistent_idempotent_and_user_scoped(
         card_id=card.id,
         is_favorite=True,
     )
+    first_favorited_at = card.favorited_at
     set_card_favorite(
         db_session,
         user_id=user_id,
@@ -129,6 +130,16 @@ def test_card_favorite_is_persistent_idempotent_and_user_scoped(
     db_session.commit()
 
     assert card.is_favorite is True
+    assert first_favorited_at is not None
+    assert card.favorited_at == first_favorited_at
+    set_card_favorite(
+        db_session,
+        user_id=user_id,
+        card_id=card.id,
+        is_favorite=False,
+    )
+    assert card.is_favorite is False
+    assert card.favorited_at is None
     with pytest.raises(CardNotFoundError):
         set_card_favorite(
             db_session,
