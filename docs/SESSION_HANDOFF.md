@@ -13,7 +13,7 @@
 | Database | PostgreSQL through Docker Compose, host port `5433` |
 | Schema head | `20260827_0007` |
 | Test baseline | 117 passing, 93.19 percent coverage |
-| Product stage | Mac/iPhone sync, mobile layouts, source-ordered drafts, formula rendering, and card favorites deployed |
+| Product stage | Mac/iPhone sync, compact mobile navigation, mobile cards, source-ordered drafts, formula rendering, and favorites implemented |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -299,7 +299,10 @@ Draft and approved cards constrain Markdown content to the phone viewport. Long
 links, identifiers, fenced code, and table cells wrap rather than creating
 horizontal page or card scrolling. Long standalone formulas can scroll inside
 their bounded formula container without widening the page. The shell cache is
-`anki-shell-v9` so installed PWAs refresh the updated stylesheet.
+`anki-shell-v11` so installed PWAs refresh the updated stylesheet. At phone
+widths, the brand occupies a compact first row and all five primary controls
+share one horizontal second row. Dropdown panels are absolutely positioned and
+do not increase header height.
 
 Any future offline-write feature requires a synchronization protocol, conflict rules, idempotency, and user-visible pending state. Do not extend the current service worker into offline database writes without that design.
 
@@ -327,6 +330,7 @@ At the handoff snapshot:
 - Approved-card mobile release `5955a5f` passed Railway health checks, production asset verification, and a local 402 by 874 CSS-pixel browser check with no page overflow. Release `362f23f` added the same floating back-to-top control used by Drafts to the approved Cards page.
 - Production account timezone was corrected from `UTC` to `America/Los_Angeles` on 2026-08-25. Release `90999cd` makes Pacific time the new-account default and tests both UTC-7 summer and UTC-8 winter day boundaries.
 - Release `b4b3f29` deployed persistent review-card favorites through migration `20260827_0007`; production health, schema head, and `anki-shell-v10` assets were verified.
+- The compact mobile header was checked at 402 by 874 CSS pixels: all five navigation controls shared the same top coordinate, header height was 87 pixels, page scroll width equaled viewport width, and opening Create did not change header height.
 
 Tests use an isolated SQLite database through fixtures. Production-like PostgreSQL constraints and deployment behavior still need dedicated acceptance testing.
 
