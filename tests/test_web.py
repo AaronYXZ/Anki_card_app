@@ -64,9 +64,13 @@ def test_primary_navigation_is_grouped_into_four_categories(client: TestClient) 
     assert '<a href="/exports/backup.json">Export</a>' in page.text
     assert '<a href="/install">Install</a>' in page.text
     assert '<a href="/restore">Restore</a>' in page.text
+    utils_start = page.text.index("<summary>Utils</summary>")
+    utils_end = page.text.index("</details>", utils_start)
+    assert '<form action="/logout" method="post">' in page.text[utils_start:utils_end]
     assert '<a class="nav-link favorite-nav-link" href="/favorites"' in page.text
     assert 'aria-label="Favorites"' in page.text
     assert ">Sign out</button>" in page.text
+    assert page.text.index(">Sign out</button>") < utils_end
 
 
 def test_favorites_page_is_user_scoped_and_newest_first(

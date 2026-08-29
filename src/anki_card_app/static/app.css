@@ -31,7 +31,8 @@ kbd { display: inline-block; min-width: 1.5rem; padding: 0.1rem 0.35rem; border:
 .nav-dropdown { position: absolute; top: calc(100% + 0.4rem); left: 0; z-index: 20; display: grid; min-width: 11rem; padding: 0.45rem; border: 1px solid var(--line); border-radius: 0.7rem; background: var(--surface); box-shadow: 0 0.8rem 2rem rgb(44 48 42 / 14%); }
 .nav-dropdown-right { right: 0; left: auto; }
 .nav-dropdown a { padding: 0.65rem 0.75rem; border-radius: 0.45rem; white-space: nowrap; }
-.nav-dropdown a:hover { background: #edf1eb; }
+.nav-dropdown .nav-button { width: 100%; min-height: auto; justify-content: flex-start; padding: 0.65rem 0.75rem; border-radius: 0.45rem; white-space: nowrap; }
+.nav-dropdown a:hover, .nav-dropdown .nav-button:hover { background: #edf1eb; }
 .brand { font-weight: 800; letter-spacing: -0.02em; }
 .container { width: min(68rem, calc(100% - 2rem)); margin: 0 auto; padding: 4rem 0; }
 .hero, .page-heading { max-width: 48rem; }

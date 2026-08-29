@@ -300,10 +300,11 @@ Draft and approved cards constrain Markdown content to the phone viewport. Long
 links, identifiers, fenced code, and table cells wrap rather than creating
 horizontal page or card scrolling. Long standalone formulas can scroll inside
 their bounded formula container without widening the page. The shell cache is
-`anki-shell-v12` so installed PWAs refresh the updated stylesheet. At phone
-widths, the brand and Favorites heart share a compact first row and all five
-primary controls share one horizontal second row. Dropdown panels are absolutely
-positioned and do not increase header height.
+`anki-shell-v13` so installed PWAs refresh the updated stylesheet. At phone
+widths, the brand and Favorites heart share a compact first row and the four
+primary controls share one horizontal second row. Sign out remains a CSRF-protected
+POST action inside Utils. Dropdown panels are absolutely positioned and do not
+increase header height.
 
 Any future offline-write feature requires a synchronization protocol, conflict rules, idempotency, and user-visible pending state. Do not extend the current service worker into offline database writes without that design.
 
@@ -335,6 +336,7 @@ At the handoff snapshot:
 - Release `44ce0aa` deployed the compact mobile header. Railway reported success, `/ready` returned ready, and production served `anki-shell-v11` with the new horizontal mobile navigation rules.
 - The Favorites library passed 118 tests and a local PostgreSQL migration to `20260827_0008`. At 402 by 874 CSS pixels, the header remained about 87 pixels high, the Favorites heart was visible beside the brand, navigation reached `/favorites`, and page width stayed at 402 pixels without horizontal overflow.
 - Release `a3db5a6` deployed the Favorites library through migration `20260827_0008`. Railway reported success, `/ready` returned ready, production served `anki-shell-v12`, and unauthenticated `/favorites` access redirected to login.
+- Folding Sign out into Utils was checked at 402 by 874 CSS pixels. The second row contained four primary controls, Sign out remained a visible POST form inside the open Utils menu, header height stayed about 87 pixels, and page width remained 402 pixels.
 
 Tests use an isolated SQLite database through fixtures. Production-like PostgreSQL constraints and deployment behavior still need dedicated acceptance testing.
 

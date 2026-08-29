@@ -41,10 +41,10 @@
               <a href="/exports/backup.json">Export</a>
               <a href="/install">Install</a>
               <a href="/restore">Restore</a>
+              <form action="/logout" method="post"><input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}"><button class="nav-button" type="submit">Sign out</button></form>
             </div>
           </details>
           <a class="nav-link favorite-nav-link" href="/favorites" aria-label="Favorites" title="Favorites">&#10084;&#65039;</a>
-          <form action="/logout" method="post"><input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}"><button class="nav-button" type="submit">Sign out</button></form>
         </nav>
       {% endif %}
     </header>
