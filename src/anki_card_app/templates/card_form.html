@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% set editing = mode == "edit" %}
-{% set selected_type = card.card_type.value if editing else form_values.card_type if form_values is defined else "normal" %}
+{% set selected_type = ("leetcode · " ~ card.template_key|replace("_", " ")) if editing and card.note_id else card.card_type.value if editing else form_values.card_type if form_values is defined else "normal" %}
 {% set form_front = version.front if editing else form_values.front if form_values is defined else "" %}
 {% set form_back = version.back if editing else form_values.back if form_values is defined else "" %}
 {% set form_cloze = version.cloze_text if editing else form_values.cloze_text if form_values is defined else "" %}
@@ -21,16 +21,38 @@
         <label><input type="radio" name="card_type" value="normal" {% if selected_type == "normal" %}checked{% endif %}> Normal</label>
         <label><input type="radio" name="card_type" value="cloze" {% if selected_type == "cloze" %}checked{% endif %}> Cloze</label>
         <label><input type="radio" name="card_type" value="skeleton_recall" {% if selected_type == "skeleton_recall" %}checked{% endif %}> Skeleton Recall</label>
+        <label><input type="radio" name="card_type" value="leetcode" {% if selected_type == "leetcode" %}checked{% endif %}> LeetCode Problem</label>
       </fieldset>
     {% else %}
       <p class="pill">{{ selected_type }}</p>
     {% endif %}
-    <label>Question or skeleton outline <textarea name="front" rows="6" placeholder="## Resolving disagreement&#10;&#10;1. Situation&#10;2. Conflict&#10;3. Action&#10;4. Result&#10;5. Lesson">{{ form_front or "" }}</textarea></label>
-    <label>Answer or completed skeleton <textarea name="back" rows="10" placeholder="1. **Situation**&#10;   - Brief trigger details&#10;&#10;2. **Conflict**&#10;   - Core tension">{{ form_back or "" }}</textarea></label>
-    <label>Cloze text <textarea name="cloze_text" rows="5" placeholder="Power equals **{{ '{{' }}c1::1 minus Type II error{{ '}}' }}**.">{{ form_cloze or "" }}</textarea></label>
-    <label>Back extra <textarea name="back_extra" rows="3" placeholder="Optional Markdown context">{{ form_extra or "" }}</textarea></label>
+    <div class="standard-card-fields">
+      <label>Question or skeleton outline <textarea name="front" rows="6" placeholder="## Resolving disagreement&#10;&#10;1. Situation&#10;2. Conflict&#10;3. Action&#10;4. Result&#10;5. Lesson">{{ form_front or "" }}</textarea></label>
+      <label>Answer or completed skeleton <textarea name="back" rows="10" placeholder="1. **Situation**&#10;   - Brief trigger details&#10;&#10;2. **Conflict**&#10;   - Core tension">{{ form_back or "" }}</textarea></label>
+      <label>Cloze text <textarea name="cloze_text" rows="5" placeholder="Power equals **{{ '{{' }}c1::1 minus Type II error{{ '}}' }}**.">{{ form_cloze or "" }}</textarea></label>
+      <label>Back extra <textarea name="back_extra" rows="3" placeholder="Optional Markdown context">{{ form_extra or "" }}</textarea></label>
+    </div>
+    {% if not editing %}
+      <div class="leetcode-card-fields">
+        <p class="field-help">One problem note creates Pattern and Python sibling cards, plus one card for each completed follow-up. Each card is scheduled independently.</p>
+        <label>Problem ID <input type="text" name="problem_id" value="{{ form_values.problem_id if form_values is defined else '' }}" placeholder="LC-209 Minimum Size Subarray Sum"></label>
+        <label>Problem summary <textarea name="problem_summary" rows="4" placeholder="Find the shortest subarray whose sum is at least target. All numbers are positive.">{{ form_values.problem_summary if form_values is defined else '' }}</textarea></label>
+        <label>Pattern <input type="text" name="pattern" value="{{ form_values.pattern if form_values is defined else '' }}" placeholder="Variable sliding window"></label>
+        <label>Invariant <textarea name="invariant" rows="3" placeholder="The current window is the smallest valid window ending at right after shrinking.">{{ form_values.invariant if form_values is defined else '' }}</textarea></label>
+        <label>Base approach <textarea name="base_approach" rows="5">{{ form_values.base_approach if form_values is defined else '' }}</textarea></label>
+        <label>Python skeleton <textarea name="python_skeleton" rows="10" placeholder="def min_sub_array_len(target: int, nums: list[int]) -> int:">{{ form_values.python_skeleton if form_values is defined else '' }}</textarea></label>
+        <label>Complexity <input type="text" name="complexity" value="{{ form_values.complexity if form_values is defined else '' }}" placeholder="Time O(n), space O(1)"></label>
+        {% for index in range(1, 4) %}
+          <fieldset class="follow-up-fields">
+            <legend>Follow-up {{ index }} <span class="muted">optional</span></legend>
+            <label>Question <textarea name="follow_up_{{ index }}_question" rows="3" placeholder="What changes if negative numbers are allowed?">{{ form_values['follow_up_' ~ index ~ '_question'] if form_values is defined else '' }}</textarea></label>
+            <label>Answer <textarea name="follow_up_{{ index }}_answer" rows="6" placeholder="1. Changed assumption&#10;2. What breaks&#10;3. Replacement approach&#10;4. New invariant&#10;5. Complexity&#10;6. Implementation changes">{{ form_values['follow_up_' ~ index ~ '_answer'] if form_values is defined else '' }}</textarea></label>
+          </fieldset>
+        {% endfor %}
+      </div>
+    {% endif %}
     <div class="actions">
-      <button class="button primary" type="submit">{{ "Save new version" if editing else "Create draft" }}</button>
+      <button class="button primary" type="submit">{{ "Save new version" if editing else "Create draft cards" }}</button>
       <a class="button" href="/cards/drafts">Cancel</a>
     </div>
   </form>

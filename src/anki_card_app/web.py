@@ -30,6 +30,11 @@ from anki_card_app.card_service import (
     set_card_favorite,
 )
 from anki_card_app.database import get_session
+from anki_card_app.leetcode_service import (
+    LeetCodeFollowUp,
+    LeetCodeNoteContent,
+    create_leetcode_note,
+)
 from anki_card_app.markdown import render_markdown
 from anki_card_app.models import (
     Card,
@@ -178,7 +183,9 @@ def parse_card_type(value: str) -> CardType:
     try:
         return CardType(value)
     except ValueError as error:
-        raise CardValidationError("Choose Normal, Cloze, or Skeleton Recall.") from error
+        raise CardValidationError(
+            "Choose Normal, Cloze, or Skeleton Recall. LeetCode Problem is also available."
+        ) from error
 
 
 def raise_http_card_error(error: CardError) -> NoReturn:
@@ -222,6 +229,19 @@ def create_card_action(
     back: Annotated[str, Form()] = "",
     cloze_text: Annotated[str, Form()] = "",
     back_extra: Annotated[str, Form()] = "",
+    problem_id: Annotated[str, Form()] = "",
+    problem_summary: Annotated[str, Form()] = "",
+    pattern: Annotated[str, Form()] = "",
+    invariant: Annotated[str, Form()] = "",
+    base_approach: Annotated[str, Form()] = "",
+    python_skeleton: Annotated[str, Form()] = "",
+    complexity: Annotated[str, Form()] = "",
+    follow_up_1_question: Annotated[str, Form()] = "",
+    follow_up_1_answer: Annotated[str, Form()] = "",
+    follow_up_2_question: Annotated[str, Form()] = "",
+    follow_up_2_answer: Annotated[str, Form()] = "",
+    follow_up_3_question: Annotated[str, Form()] = "",
+    follow_up_3_answer: Annotated[str, Form()] = "",
 ) -> Response:
     user_id = current_user_id(request, session)
     form_values = {
@@ -230,19 +250,52 @@ def create_card_action(
         "back": back,
         "cloze_text": cloze_text,
         "back_extra": back_extra,
+        "problem_id": problem_id,
+        "problem_summary": problem_summary,
+        "pattern": pattern,
+        "invariant": invariant,
+        "base_approach": base_approach,
+        "python_skeleton": python_skeleton,
+        "complexity": complexity,
+        "follow_up_1_question": follow_up_1_question,
+        "follow_up_1_answer": follow_up_1_answer,
+        "follow_up_2_question": follow_up_2_question,
+        "follow_up_2_answer": follow_up_2_answer,
+        "follow_up_3_question": follow_up_3_question,
+        "follow_up_3_answer": follow_up_3_answer,
     }
     try:
-        create_draft(
-            session,
-            user_id=user_id,
-            card_type=parse_card_type(card_type),
-            content=CardContent(
-                front=front,
-                back=back,
-                cloze_text=cloze_text,
-                back_extra=back_extra,
-            ),
-        )
+        if card_type == "leetcode":
+            create_leetcode_note(
+                session,
+                user_id=user_id,
+                content=LeetCodeNoteContent(
+                    problem_id=problem_id,
+                    problem_summary=problem_summary,
+                    pattern=pattern,
+                    invariant=invariant,
+                    base_approach=base_approach,
+                    python_skeleton=python_skeleton,
+                    complexity=complexity,
+                    follow_ups=(
+                        LeetCodeFollowUp(follow_up_1_question, follow_up_1_answer),
+                        LeetCodeFollowUp(follow_up_2_question, follow_up_2_answer),
+                        LeetCodeFollowUp(follow_up_3_question, follow_up_3_answer),
+                    ),
+                ),
+            )
+        else:
+            create_draft(
+                session,
+                user_id=user_id,
+                card_type=parse_card_type(card_type),
+                content=CardContent(
+                    front=front,
+                    back=back,
+                    cloze_text=cloze_text,
+                    back_extra=back_extra,
+                ),
+            )
         session.commit()
     except CardError as error:
         session.rollback()

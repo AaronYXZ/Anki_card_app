@@ -22,6 +22,7 @@ from anki_card_app.models import (
     SchedulingState,
     SourceChunk,
     SourceDocument,
+    StudyNote,
     UserAccount,
 )
 
@@ -92,6 +93,7 @@ _TABLE_SPECS = (
             "source_chunk_id": "source_chunks",
         },
     ),
+    _TableSpec("study_notes", StudyNote, {}, True),
     _TableSpec(
         "cards",
         Card,
@@ -99,6 +101,7 @@ _TABLE_SPECS = (
             "source_document_id": "source_documents",
             "source_chunk_id": "source_chunks",
             "generation_run_id": "generation_runs",
+            "note_id": "study_notes",
             "current_version_id": "card_versions",
         },
         True,
@@ -119,9 +122,14 @@ _TABLE_SPECS = (
     ),
 )
 _TABLES_BY_NAME = {spec.name: spec for spec in _TABLE_SPECS}
-_OWNED_ROOT_MODELS = (SourceDocument, GenerationRun, Card, ReviewSession, ReviewLog)
+_OWNED_ROOT_MODELS = (SourceDocument, GenerationRun, StudyNote, Card, ReviewSession, ReviewLog)
 _OPTIONAL_COLUMN_DEFAULTS: dict[str, dict[str, Any]] = {
-    "cards": {"is_favorite": False, "favorited_at": None},
+    "cards": {
+        "is_favorite": False,
+        "favorited_at": None,
+        "note_id": None,
+        "template_key": None,
+    },
 }
 
 
@@ -169,9 +177,10 @@ def _validate_payload(
     document = cast(dict[str, Any], payload)
     if document.get("format") != "anki-card-app-backup":
         raise RestoreValidationError("File is not an Anki Card App backup.")
-    if document.get("format_version") != EXPORT_FORMAT_VERSION:
+    format_version = document.get("format_version")
+    if format_version not in {1, EXPORT_FORMAT_VERSION}:
         raise RestoreValidationError(
-            f"Unsupported backup format version. Expected {EXPORT_FORMAT_VERSION}."
+            f"Unsupported backup format version. Expected 1 or {EXPORT_FORMAT_VERSION}."
         )
     user_data = document.get("user")
     data = document.get("data")
@@ -183,7 +192,12 @@ def _validate_payload(
     export_user_id = _parse_uuid(typed_user_data.get("id"), location="user.id")
     user_settings = _validate_user_settings(typed_user_data)
 
-    expected_tables = set(_TABLES_BY_NAME)
+    payload_specs = tuple(
+        spec
+        for spec in _TABLE_SPECS
+        if format_version == EXPORT_FORMAT_VERSION or spec.name != "study_notes"
+    )
+    expected_tables = {spec.name for spec in payload_specs}
     actual_tables = set(data)
     if actual_tables != expected_tables:
         missing = sorted(expected_tables - actual_tables)
@@ -194,11 +208,12 @@ def _validate_payload(
         if unexpected:
             details.append(f"unexpected: {', '.join(unexpected)}")
         raise RestoreValidationError(
-            f"Backup tables do not match format version 1 ({'; '.join(details)})."
+            f"Backup tables do not match format version {format_version} "
+            f"({'; '.join(details)})."
         )
 
     validated: dict[str, list[dict[str, Any]]] = {}
-    for spec in _TABLE_SPECS:
+    for spec in payload_specs:
         raw_rows = data[spec.name]
         if not isinstance(raw_rows, list):
             raise RestoreValidationError(f"data.{spec.name} must be a list.")
@@ -229,6 +244,8 @@ def _validate_payload(
                 raise RestoreValidationError(f"{location} is not owned by the exported user.")
             rows.append(normalized_row)
         validated[spec.name] = rows
+    if format_version == 1:
+        validated["study_notes"] = []
     return export_user_id, user_settings, validated
 
 

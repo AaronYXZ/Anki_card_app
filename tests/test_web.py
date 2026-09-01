@@ -40,11 +40,42 @@ def test_dashboard_and_empty_workflows(client: TestClient) -> None:
     assert "Nothing is due" in review.text
     assert "Create a card" in new_card.text
     assert "Skeleton Recall" in new_card.text
+    assert "LeetCode Problem" in new_card.text
     assert install.status_code == 200
     assert "Add to Home Screen" in install.text
     assert "Online connection required" in install.text
     assert "/manifest.webmanifest" in install.text
     assert "/static/app.js" in install.text
+
+
+def test_leetcode_form_creates_pattern_python_and_follow_up_drafts(
+    client: TestClient, db_session: Session
+) -> None:
+    response = client.post(
+        "/cards/new",
+        data={
+            "card_type": "leetcode",
+            "problem_id": "LC-209 Minimum Size Subarray Sum",
+            "problem_summary": "Find the shortest qualifying subarray. Values are positive.",
+            "pattern": "Variable sliding window",
+            "invariant": "Shrink until the window is minimal.",
+            "base_approach": "Expand right and shrink left while valid.",
+            "python_skeleton": "def solve(nums: list[int]) -> int:\n    return 0",
+            "complexity": "Time O(n), space O(1)",
+            "follow_up_1_question": "What if negatives are allowed?",
+            "follow_up_1_answer": "Use prefix sums and a monotonic deque. Time O(n).",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/cards/drafts"
+    cards = db_session.scalars(select(Card).order_by(Card.template_key)).all()
+    assert {card.template_key for card in cards} == {"pattern", "python", "follow_up_1"}
+    assert len({card.note_id for card in cards}) == 1
+    drafts = client.get("/cards/drafts")
+    assert "leetcode · pattern" in drafts.text
+    assert "What if negatives are allowed?" in drafts.text
 
 
 def test_primary_navigation_is_grouped_into_four_categories(client: TestClient) -> None:

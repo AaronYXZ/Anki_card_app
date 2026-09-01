@@ -76,7 +76,8 @@ def test_authenticated_backup_contains_complete_owned_history(
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["content-disposition"].startswith("attachment;")
     assert payload["format"] == "anki-card-app-backup"
-    assert payload["format_version"] == 1
+    assert payload["format_version"] == 2
+    assert "study_notes" in payload["data"]
     assert payload["user"]["id"] == str(owner_id)
     assert payload["data"]["cards"][0]["is_favorite"] is True
     assert payload["data"]["cards"][0]["favorited_at"] is not None

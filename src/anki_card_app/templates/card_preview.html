@@ -7,7 +7,7 @@
     <p>This preview does not change the card's schedule or review history.</p>
   </section>
   <article class="review-card">
-    <div class="card-meta"><span class="pill">{{ card_view.card.card_type.value }}</span><span class="pill status-{{ card_view.card.state.value }}">{{ card_view.card.state.value }}</span><span>Version {{ card_view.version.version_number }}</span></div>
+    <div class="card-meta"><span class="pill">{% if card_view.card.note_id %}leetcode · {{ card_view.card.template_key|replace("_", " ") }}{% else %}{{ card_view.card.card_type.value }}{% endif %}</span><span class="pill status-{{ card_view.card.state.value }}">{{ card_view.card.state.value }}</span><span>Version {{ card_view.version.version_number }}</span></div>
     <div class="markdown-content card-prompt{% if card_view.card.card_type.value == 'skeleton_recall' %} skeleton-prompt{% endif %}">{{ card_view.prompt|markdown }}</div>
     <details open>
       <summary class="button">Answer preview</summary>

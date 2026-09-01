@@ -10,7 +10,7 @@
     <div class="card-list">
       {% for item in cards %}
         <article class="source-card approved-card">
-          <div class="card-meta"><span class="pill">{{ item.card.card_type.value }}</span><span class="pill status-{{ item.card.state.value }}">{{ item.card.state.value }}</span><span>Favorited {{ item.card.favorited_at.strftime("%Y-%m-%d %H:%M") if item.card.favorited_at else "previously" }}</span></div>
+          <div class="card-meta"><span class="pill">{% if item.card.note_id %}leetcode · {{ item.card.template_key|replace("_", " ") }}{% else %}{{ item.card.card_type.value }}{% endif %}</span><span class="pill status-{{ item.card.state.value }}">{{ item.card.state.value }}</span><span>Favorited {{ item.card.favorited_at.strftime("%Y-%m-%d %H:%M") if item.card.favorited_at else "previously" }}</span></div>
           <div class="markdown-content card-prompt{% if item.card.card_type.value == 'skeleton_recall' %} skeleton-prompt{% endif %}">{{ item.prompt|markdown }}</div>
           <div class="markdown-content answer-preview">{{ item.answer|markdown }}</div>
           <div class="actions"><a class="button" href="/cards/{{ item.card.id }}">Preview</a><a class="button" href="/cards/{{ item.card.id }}/edit">Edit</a></div>

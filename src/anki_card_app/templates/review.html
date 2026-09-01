@@ -8,7 +8,7 @@
   </section>
   {% if entry and card_view %}
     <article class="review-card">
-      <span class="pill">{{ card_view.card.card_type.value }}</span>
+      <span class="pill">{% if card_view.card.note_id %}leetcode · {{ card_view.card.template_key|replace("_", " ") }}{% else %}{{ card_view.card.card_type.value }}{% endif %}</span>
       <div class="markdown-content card-prompt{% if card_view.card.card_type.value == 'skeleton_recall' %} skeleton-prompt{% endif %}">{{ card_view.prompt|markdown }}</div>
       {% if entry.item.revealed_at %}
         <form class="favorite-form" action="/cards/{{ entry.card.id }}/favorite" method="post">

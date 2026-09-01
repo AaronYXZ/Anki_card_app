@@ -19,11 +19,12 @@ from anki_card_app.models import (
     SchedulingState,
     SourceChunk,
     SourceDocument,
+    StudyNote,
     UserAccount,
     utc_now,
 )
 
-EXPORT_FORMAT_VERSION = 1
+EXPORT_FORMAT_VERSION = 2
 
 
 def _serialize_value(value: Any) -> Any:
@@ -78,6 +79,11 @@ def build_user_export(session: Session, *, user_id: uuid.UUID) -> dict[str, Any]
         .where(GenerationRun.user_id == user_id)
         .order_by(GenerationChunkRun.generation_run_id, GenerationChunkRun.id)
     ).all()
+    study_notes = session.scalars(
+        select(StudyNote)
+        .where(StudyNote.user_id == user_id)
+        .order_by(StudyNote.created_at, StudyNote.id)
+    ).all()
     cards = session.scalars(
         select(Card).where(Card.user_id == user_id).order_by(Card.created_at, Card.id)
     ).all()
@@ -128,6 +134,7 @@ def build_user_export(session: Session, *, user_id: uuid.UUID) -> dict[str, Any]
             "source_chunks": [_serialize_row(row) for row in source_chunks],
             "generation_runs": [_serialize_row(row) for row in generation_runs],
             "generation_chunk_runs": [_serialize_row(row) for row in generation_chunk_runs],
+            "study_notes": [_serialize_row(row) for row in study_notes],
             "cards": [_serialize_row(row) for row in cards],
             "card_versions": [_serialize_row(row) for row in card_versions],
             "scheduling_states": [_serialize_row(row) for row in scheduling_states],

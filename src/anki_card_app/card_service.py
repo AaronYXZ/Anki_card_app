@@ -139,7 +139,11 @@ def create_draft(
     generation_run_id: uuid.UUID | None = None,
     source_excerpt: str | None = None,
     ai_enrichment: str | None = None,
+    note_id: uuid.UUID | None = None,
+    template_key: str | None = None,
 ) -> Card:
+    if (note_id is None) != (template_key is None):
+        raise CardValidationError("A sibling card requires both a note and a template key.")
     normalized = validate_content(card_type, content)
     fingerprint = content_fingerprint(card_type, normalized)
     if session.scalar(
@@ -156,6 +160,8 @@ def create_draft(
         source_document_id=source_document_id,
         source_chunk_id=source_chunk_id,
         generation_run_id=generation_run_id,
+        note_id=note_id,
+        template_key=template_key,
         content_fingerprint=fingerprint,
     )
     session.add(card)
