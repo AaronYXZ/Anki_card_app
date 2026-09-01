@@ -10,8 +10,8 @@
     <link rel="icon" href="{{ url_for('static', path='/favicon.svg') }}" type="image/svg+xml">
     <link rel="apple-touch-icon" href="{{ url_for('static', path='/icon-192.png') }}">
     <link rel="manifest" href="/manifest.webmanifest">
-    <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}">
-    <script src="{{ url_for('static', path='/app.js') }}" defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}?v=15">
+    <script src="{{ url_for('static', path='/app.js') }}?v=15" defer></script>
     {% block head_extra %}{% endblock %}
   </head>
   <body id="top">
