@@ -1,18 +1,23 @@
 import re
 import uuid
+from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from anki_card_app.card_service import CardContent, create_draft
 from anki_card_app.config import get_settings
 from anki_card_app.models import (
     Card,
     CardState,
     CardType,
     CardVersion,
+    ReviewLog,
     ReviewSession,
     SchedulingState,
+    SourceChunk,
+    SourceDocument,
     UserAccount,
 )
 
@@ -59,7 +64,66 @@ def test_primary_navigation_is_grouped_into_four_categories(client: TestClient) 
     assert '<a href="/exports/backup.json">Export</a>' in page.text
     assert '<a href="/install">Install</a>' in page.text
     assert '<a href="/restore">Restore</a>' in page.text
+    utils_start = page.text.index("<summary>Utils</summary>")
+    utils_end = page.text.index("</details>", utils_start)
+    assert '<form action="/logout" method="post">' in page.text[utils_start:utils_end]
+    assert '<a class="nav-link favorite-nav-link" href="/favorites"' in page.text
+    assert 'aria-label="Favorites"' in page.text
     assert ">Sign out</button>" in page.text
+    assert page.text.index(">Sign out</button>") < utils_end
+
+
+def test_favorites_page_is_user_scoped_and_newest_first(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    client.get("/")
+    owner_id = get_settings().development_user_id
+    older = create_draft(
+        db_session,
+        user_id=owner_id,
+        card_type=CardType.NORMAL,
+        content=CardContent(front="Older favorite", back="Older answer"),
+    )
+    newer = create_draft(
+        db_session,
+        user_id=owner_id,
+        card_type=CardType.NORMAL,
+        content=CardContent(front="Newer favorite", back="Newer answer"),
+    )
+    hidden = create_draft(
+        db_session,
+        user_id=owner_id,
+        card_type=CardType.NORMAL,
+        content=CardContent(front="Not a favorite", back="Hidden answer"),
+    )
+    other_user = UserAccount(email="favorite-other@example.com")
+    db_session.add(other_user)
+    db_session.flush()
+    other = create_draft(
+        db_session,
+        user_id=other_user.id,
+        card_type=CardType.NORMAL,
+        content=CardContent(front="Other user's favorite", back="Private"),
+    )
+    older.is_favorite = True
+    older.favorited_at = datetime(2026, 8, 26, 12, tzinfo=UTC)
+    newer.is_favorite = True
+    newer.favorited_at = datetime(2026, 8, 27, 12, tzinfo=UTC)
+    other.is_favorite = True
+    other.favorited_at = datetime(2026, 8, 27, 13, tzinfo=UTC)
+    db_session.commit()
+
+    page = client.get("/favorites")
+
+    assert page.status_code == 200
+    assert "Favorites ❤️" in page.text
+    assert page.text.index("Newer favorite") < page.text.index("Older favorite")
+    assert "Not a favorite" not in page.text
+    assert "Other user's favorite" not in page.text
+    assert f'href="/cards/{newer.id}"' in page.text
+    assert f'href="/cards/{newer.id}/edit"' in page.text
+    assert hidden.is_favorite is False
 
 
 def test_normal_card_create_edit_approve_and_review(
@@ -134,7 +198,25 @@ def test_normal_card_create_edit_approve_and_review(
     assert "Again" in revealed_page.text
     assert 'data-shortcut="1"' in revealed_page.text
     assert 'data-shortcut="4"' in revealed_page.text
-    attempt_match = re.search(r'name="attempt_id" value="([^"]+)"', revealed_page.text)
+    assert 'aria-label="Add to favorites"' in revealed_page.text
+    assert 'aria-pressed="false"' in revealed_page.text
+
+    favorited = client.post(
+        f"/cards/{card.id}/favorite",
+        data={"favorite": "true"},
+        follow_redirects=False,
+    )
+    assert favorited.status_code == 303
+    assert favorited.headers["location"] == "/review"
+    db_session.refresh(card)
+    assert card.is_favorite is True
+
+    favorite_page = client.get("/review")
+    assert 'class="favorite-button active"' in favorite_page.text
+    assert 'aria-label="Remove from favorites"' in favorite_page.text
+    assert 'aria-pressed="true"' in favorite_page.text
+    assert "Again" in favorite_page.text
+    attempt_match = re.search(r'name="attempt_id" value="([^"]+)"', favorite_page.text)
     assert attempt_match is not None
 
     rated = client.post(
@@ -172,7 +254,45 @@ def test_approved_cards_page_lists_active_cards_only(
     assert "Still a draft" not in page.text
     assert "Created " in page.text
     assert "Version 1" in page.text
+    assert 'class="source-card approved-card"' in page.text
+    assert 'class="back-to-top" href="#top"' in page.text
+    assert f'href="/cards/{approved.id}"' in page.text
     assert f'href="/cards/{approved.id}/edit"' in page.text
+
+
+def test_active_card_edit_redirects_to_review_preview_without_review_side_effects(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    client.post(
+        "/cards/new",
+        data={"card_type": "normal", "front": "Original", "back": "Old answer"},
+    )
+    card = db_session.scalar(select(Card))
+    assert card is not None
+    client.post(f"/cards/{card.id}/approve")
+
+    edited = client.post(
+        f"/cards/{card.id}/edit",
+        data={
+            "front": "Updated **question**",
+            "back": "Updated answer with `code`.",
+        },
+        follow_redirects=False,
+    )
+
+    assert edited.status_code == 303
+    assert edited.headers["location"] == f"/cards/{card.id}"
+    preview = client.get(edited.headers["location"])
+    assert preview.status_code == 200
+    assert "Review preview" in preview.text
+    assert "Modified card" in preview.text
+    assert "Updated <strong>question</strong>" in preview.text
+    assert "Updated answer with <code>code</code>." in preview.text
+    assert "<details open>" in preview.text
+    assert "does not change the card's schedule or review history" in preview.text
+    assert db_session.scalar(select(func.count()).select_from(ReviewSession)) == 0
+    assert db_session.scalar(select(func.count()).select_from(ReviewLog)) == 0
 
 
 def test_manual_markdown_is_preserved_and_rendered_in_draft_and_review(
@@ -205,6 +325,34 @@ def test_manual_markdown_is_preserved_and_rendered_in_draft_and_review(
     review = client.get("/review")
     assert "<h2>Power</h2>" in review.text
     assert "<strong>power</strong>" in review.text
+
+
+def test_math_is_rendered_in_drafts_and_approved_cards(
+    client: TestClient, db_session: Session
+) -> None:
+    formula = r"Y_{adj} = Y - \theta \cdot (X - \bar{X})"
+    created = client.post(
+        "/cards/new",
+        data={
+            "card_type": "normal",
+            "front": formula,
+            "back": r"Use $\bar{X}$ as the mean.",
+        },
+        follow_redirects=False,
+    )
+    assert created.status_code == 303
+    card = db_session.scalar(select(Card))
+    assert card is not None
+
+    draft = client.get("/cards/drafts")
+    assert '<div class="math block"><math' in draft.text
+    assert "<msub>" in draft.text
+    assert "<mover>" in draft.text
+
+    client.post(f"/cards/{card.id}/approve", follow_redirects=False)
+    approved = client.get("/cards")
+    assert '<div class="math block"><math' in approved.text
+    assert '<span class="math inline"><math' in approved.text
 
 
 def test_cloze_card_rendering_and_rejection(client: TestClient, db_session: Session) -> None:
@@ -279,12 +427,14 @@ def test_invalid_card_type_and_missing_card_errors(client: TestClient) -> None:
     )
     missing_id = uuid.uuid4()
     missing_edit = client.get(f"/cards/{missing_id}/edit")
+    missing_preview = client.get(f"/cards/{missing_id}")
     missing_approve = client.post(f"/cards/{missing_id}/approve")
     missing_reject = client.post(f"/cards/{missing_id}/reject")
 
     assert invalid_type.status_code == 422
     assert "Choose Normal, Cloze, or Skeleton Recall" in invalid_type.text
     assert missing_edit.status_code == 404
+    assert missing_preview.status_code == 404
     assert missing_approve.status_code == 404
     assert missing_reject.status_code == 404
 
@@ -313,6 +463,59 @@ def test_draft_actions_redirect_to_adjacent_card(client: TestClient, db_session:
     assert rejected.headers["location"] == f"/cards/drafts#card-{cards[1].id}"
     page = client.get("/cards/drafts")
     assert f'id="card-{cards[1].id}"' in page.text
+
+
+def test_imported_drafts_follow_their_original_note_order(
+    client: TestClient, db_session: Session
+) -> None:
+    client.get("/")
+    user_id = get_settings().development_user_id
+    document = SourceDocument(
+        user_id=user_id,
+        relative_path="ordered.md",
+        filename="ordered.md",
+        content_hash="a" * 64,
+        raw_content="Paragraph one.\n\nParagraph two.\n\nParagraph three.",
+    )
+    db_session.add(document)
+    db_session.flush()
+    first_chunk = SourceChunk(
+        source_document_id=document.id,
+        sequence=0,
+        text="Paragraph one.\n\nParagraph two.",
+    )
+    second_chunk = SourceChunk(
+        source_document_id=document.id,
+        sequence=1,
+        text="Paragraph three.",
+    )
+    db_session.add_all([first_chunk, second_chunk])
+    db_session.flush()
+
+    for front, excerpt, chunk in (
+        ("Question from paragraph three", "Paragraph three.", second_chunk),
+        ("Question from paragraph two", "Paragraph two.", first_chunk),
+        ("Question from paragraph one", "Paragraph one.", first_chunk),
+    ):
+        create_draft(
+            db_session,
+            user_id=user_id,
+            card_type=CardType.NORMAL,
+            content=CardContent(front=front, back="Answer"),
+            source_document_id=document.id,
+            source_chunk_id=chunk.id,
+            source_excerpt=excerpt,
+        )
+    db_session.commit()
+
+    page = client.get("/cards/drafts")
+
+    assert page.text.index("Question from paragraph one") < page.text.index(
+        "Question from paragraph two"
+    )
+    assert page.text.index("Question from paragraph two") < page.text.index(
+        "Question from paragraph three"
+    )
 
 
 def test_development_user_is_created_once(client: TestClient, db_session: Session) -> None:

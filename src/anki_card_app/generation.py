@@ -33,7 +33,7 @@ from anki_card_app.models import (
     utc_now,
 )
 
-PROMPT_VERSION = "anki-v4-markdown-preservation"
+PROMPT_VERSION = "anki-v5-math-rendering"
 CARD_GENERATION_PROMPT = """
 You create durable interview-preparation flashcards for machine learning engineers.
 Extract the source's key concepts, facts, decisions, equations, code behavior, and
@@ -72,6 +72,8 @@ material into front, back, cloze_text, back_extra, or ai_enrichment. In particul
 lists, emphasis, links, inline code, fenced code blocks, and math notation instead of
 flattening them into plain text. Do not add Markdown decoration that changes the source's
 meaning. The source_excerpt must remain an exact substring, including its original Markdown.
+Wrap generated inline LaTeX in `$...$` and standalone equations in `$$...$$` so the card
+renderer typesets them. Preserve math delimiters that already exist in the source.
 
 Preserve useful code and math. Do not invent unsupported claims. Put optional context or
 pitfalls in ai_enrichment, never in the tested prompt. Quote a short, exact source_excerpt

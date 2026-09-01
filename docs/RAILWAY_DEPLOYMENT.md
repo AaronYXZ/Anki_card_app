@@ -4,10 +4,10 @@
 
 The production service is available at
 <https://web-production-a42e0.up.railway.app>. The deployment from commit
-`32e242c` passed the Alembic migration gate through `20260810_0006`, the
-`/ready` PostgreSQL check, and Railway's service health check on 2026-08-13.
-The authenticated restore route is live; anonymous `/restore` requests redirect
-to login.
+`b4b3f29` passed the Alembic migration gate through `20260827_0007`, the
+`/ready` PostgreSQL check, and Railway's service health check on 2026-08-27.
+The authenticated restore route and persistent review-card favorites are live;
+anonymous learning-data requests redirect to login.
 
 The first deployment was uploaded with `railway up`. GitHub autodeploy remains
 pending until the Railway GitHub App is granted access to

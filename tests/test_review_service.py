@@ -32,6 +32,18 @@ from anki_card_app.user_service import ensure_user
 NOW = datetime(2026, 8, 10, 12, tzinfo=UTC)
 
 
+def test_pacific_day_start_tracks_daylight_saving_time() -> None:
+    summer = datetime(2026, 8, 25, 20, tzinfo=UTC)
+    winter = datetime(2026, 12, 25, 20, tzinfo=UTC)
+
+    assert review_service._day_start_utc(summer, "America/Los_Angeles") == datetime(
+        2026, 8, 25, 7, tzinfo=UTC
+    )
+    assert review_service._day_start_utc(winter, "America/Los_Angeles") == datetime(
+        2026, 12, 25, 8, tzinfo=UTC
+    )
+
+
 def make_user(db_session: Session, *, daily_limit: int = 25, timezone: str = "UTC") -> UserAccount:
     identifier = uuid.uuid4()
     user = ensure_user(

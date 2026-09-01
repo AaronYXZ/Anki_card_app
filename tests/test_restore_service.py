@@ -96,6 +96,7 @@ def _complete_export(session: Session, *, user: UserAccount) -> dict[str, Any]:
         generation_run_id=run.id,
         source_excerpt=chunk.text,
     )
+    active.is_favorite = True
     approve_card(session, user_id=user.id, card_id=active.id, due_at=utc_now())
     create_draft(
         session,
@@ -160,6 +161,8 @@ def test_restore_round_trip_preserves_learning_history_and_drafts(db_session: Se
     assert result.counts["review_logs"] == 1
     assert result.total_rows == sum(len(rows) for rows in payload["data"].values())
     assert {card.state for card in restored_cards} == {CardState.ACTIVE, CardState.DRAFT}
+    assert sum(card.is_favorite for card in restored_cards) == 1
+    assert next(card for card in restored_cards if card.is_favorite).favorited_at is not None
     assert not source_card_ids.intersection(card.id for card in restored_cards)
     assert {version.created_by for version in restored_versions} == {"ai"}
     assert restored_logs[0].rating == 3
@@ -170,6 +173,25 @@ def test_restore_round_trip_preserves_learning_history_and_drafts(db_session: Se
     assert target_user.timezone == "America/Los_Angeles"
     assert target_user.daily_limit == 41
     assert target_user.desired_retention == pytest.approx(0.87)
+
+
+def test_restore_old_backup_defaults_missing_favorites_to_false(db_session: Session) -> None:
+    source_user = UserAccount(email="legacy-source@example.com")
+    target_user = UserAccount(email="legacy-target@example.com")
+    db_session.add_all([source_user, target_user])
+    db_session.flush()
+    payload = _complete_export(db_session, user=source_user)
+    for card in payload["data"]["cards"]:
+        del card["is_favorite"]
+        del card["favorited_at"]
+
+    restore_user_export(db_session, user_id=target_user.id, payload=payload)
+    db_session.commit()
+
+    restored_cards = db_session.scalars(select(Card).where(Card.user_id == target_user.id)).all()
+    assert restored_cards
+    assert all(card.is_favorite is False for card in restored_cards)
+    assert all(card.favorited_at is None for card in restored_cards)
 
 
 def test_restore_rejects_nonempty_account_without_changing_it(db_session: Session) -> None:

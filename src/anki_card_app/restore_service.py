@@ -120,6 +120,9 @@ _TABLE_SPECS = (
 )
 _TABLES_BY_NAME = {spec.name: spec for spec in _TABLE_SPECS}
 _OWNED_ROOT_MODELS = (SourceDocument, GenerationRun, Card, ReviewSession, ReviewLog)
+_OPTIONAL_COLUMN_DEFAULTS: dict[str, dict[str, Any]] = {
+    "cards": {"is_favorite": False, "favorited_at": None},
+}
 
 
 def _parse_uuid(value: object, *, location: str) -> uuid.UUID:
@@ -207,14 +210,24 @@ def _validate_payload(
                 raise RestoreValidationError(f"{location} must be an object.")
             row = cast(dict[str, Any], raw_row)
             actual_columns = set(row)
-            if actual_columns != expected_columns:
+            optional_defaults = _OPTIONAL_COLUMN_DEFAULTS.get(spec.name, {})
+            required_columns = expected_columns - set(optional_defaults)
+            if not required_columns <= actual_columns <= expected_columns:
                 raise RestoreValidationError(f"{location} fields do not match the backup schema.")
+            normalized_row = {**optional_defaults, **row}
+            if (
+                spec.name == "cards"
+                and normalized_row["is_favorite"] is True
+                and normalized_row["favorited_at"] is None
+            ):
+                normalized_row["favorited_at"] = normalized_row.get("updated_at")
             if (
                 spec.owns_user_id
-                and _parse_uuid(row["user_id"], location=f"{location}.user_id") != export_user_id
+                and _parse_uuid(normalized_row["user_id"], location=f"{location}.user_id")
+                != export_user_id
             ):
                 raise RestoreValidationError(f"{location} is not owned by the exported user.")
-            rows.append(row)
+            rows.append(normalized_row)
         validated[spec.name] = rows
     return export_user_id, user_settings, validated
 

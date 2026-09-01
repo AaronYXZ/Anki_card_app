@@ -5,15 +5,15 @@
 | Field | Value |
 |---|---|
 | Project | Anki Card App |
-| Snapshot date | 2026-08-14 |
+| Snapshot date | 2026-08-27 |
 | Branch | `dev` |
-| Live deployment source commit | `f289394 Add approved cards and code highlighting` |
+| Live deployment source commit | `a3db5a6 Add newest-first favorites library` |
 | Local URL | `http://127.0.0.1:8000` |
 | Production URL | `https://web-production-a42e0.up.railway.app` |
 | Database | PostgreSQL through Docker Compose, host port `5433` |
-| Schema head | `20260810_0006` |
-| Test baseline | 109 passing, 94.01 percent coverage |
-| Product stage | Approved Cards library and code highlighting deployed, first-account and device sync acceptance pending |
+| Schema head | `20260827_0008` |
+| Test baseline | 118 passing, 93.24 percent coverage |
+| Product stage | Mac/iPhone sync, compact mobile navigation, mobile cards, source-ordered drafts, formula rendering, and a newest-first favorites library deployed |
 
 Start every continuation by running `git status --short`. Preserve any user changes that appeared after this snapshot.
 
@@ -105,7 +105,7 @@ Important modules:
 | `src/anki_card_app/notes_web.py` | Imported-note ledger and note-to-card traceability |
 | `src/anki_card_app/import_service.py` | Safe upload parsing, ZIP limits, Markdown chunking, content hashing |
 | `src/anki_card_app/generation.py` | Prompt, structured OpenAI output, validation, deduplication, progress persistence |
-| `src/anki_card_app/markdown.py` | CommonMark rendering with embedded HTML disabled and Pygments fenced-code highlighting |
+| `src/anki_card_app/markdown.py` | Safe CommonMark, Pygments code highlighting, and server-side LaTeX-to-MathML rendering |
 | `src/anki_card_app/card_service.py` | Card validation, immutable versions, lifecycle transitions |
 | `src/anki_card_app/review_service.py` | Daily queue, reveal rules, idempotent rating transaction |
 | `src/anki_card_app/fsrs_adapter.py` | FSRS state creation, restoration, application, and snapshots |
@@ -159,6 +159,8 @@ rejected unless `AUTH_MODE=password` and `SESSION_COOKIE_SECURE=true`. See
 | `/notes/{document_id}` | GET | Source metadata and extracted cards |
 | `/cards/new` | GET, POST | Manual card creation |
 | `/cards` | GET | Browse and edit approved active cards |
+| `/favorites` | GET | Browse the current user's favorite cards by newest favorite timestamp |
+| `/cards/{card_id}` | GET | Review-format card preview without scheduling or history side effects |
 | `/cards/drafts` | GET | Draft review inbox with a floating back-to-top control |
 | `/cards/{card_id}/edit` | GET, POST | Versioned content editing |
 | `/cards/{card_id}/approve` | POST | Activate card and initialize scheduling |
@@ -206,15 +208,16 @@ Do not violate these invariants:
 8. Scheduling-state update and review-log insertion occur in one transaction.
 9. `ReviewLog.attempt_id` is globally unique and makes submission idempotent.
 10. Review logs and prior or new FSRS snapshots are append-only history.
-11. Stored timestamps are UTC. User timezone affects local-day boundaries and presentation.
+11. Stored timestamps are UTC. User timezone affects local-day boundaries and presentation. New accounts default to `America/Los_Angeles`, which automatically switches between UTC-7 and UTC-8.
 12. Password mode never falls back to the fixed development identity.
 13. Raw authentication session tokens are never persisted. Only SHA-256 digests are stored.
 14. Every POST validates a CSRF token derived from the current Session after login.
-15. Ordinary dynamic content is Jinja-autoescaped. Card Markdown is converted by the shared renderer with embedded HTML and unsafe links disabled before templates receive safe markup. Recognized fenced-code languages are highlighted by Pygments.
+15. Ordinary dynamic content is Jinja-autoescaped. Card Markdown is converted by the shared renderer with embedded HTML and unsafe links disabled before templates receive safe markup. Recognized fenced-code languages are highlighted by Pygments. LaTeX is converted on the server and every generated MathML element and attribute must pass a strict allowlist.
+16. Card favorites are user-owned persistent Card metadata. The first false-to-true transition records `favorited_at`; idempotent repeats preserve that timestamp, while unfavoriting clears it. Toggling a favorite does not alter the review session, rating, or FSRS schedule. JSON backups preserve favorites and timestamps. Older version 1 backups default missing favorite fields to false and backfill a missing timestamp for an existing favorite from `updated_at`.
 
 ## 8. Generation behavior
 
-The active prompt version is `anki-v4-markdown-preservation`. It treats examples,
+The active prompt version is `anki-v5-math-rendering`. It treats examples,
 cases, scenarios, analogies, anecdotes, sample calculations, and illustrative
 code as supporting context instead of standalone card material. It may test an
 explicitly stated reusable principle, while keeping the example as optional
@@ -223,7 +226,9 @@ Recall card when the source clearly presents the full story as rehearsal materia
 incidental details are not atomized into cards. Every source chunk may return at
 most 20 candidates. The prompt also requires generated fields to retain useful
 source Markdown such as lists, emphasis, links, inline code, fenced code, and math
-notation. Exact source excerpts retain their original Markdown. A candidate is
+notation. Inline formulas use `$...$` and standalone formulas use `$$...$$` so
+drafts and cards can render them consistently. Exact source excerpts retain their
+original Markdown. A candidate is
 accepted only when:
 
 - its Pydantic schema is valid;
@@ -232,6 +237,11 @@ accepted only when:
 - its user-level content fingerprint does not already exist.
 
 Progress is saved after every chunk. Chunk failures are tracked separately, which allows a partial run to preserve successful work.
+
+The Draft inbox groups cards by their most recent import or manual-creation batch. Imported
+cards follow `SourceChunk.sequence`, then the position of their exact `source_excerpt` inside
+the chunk. This preserves the original note order even when cards were created in a different
+order. Approve and reject redirects use the same ordering.
 
 Provider error behavior:
 
@@ -272,6 +282,8 @@ Rating mapping:
 | `3` | Good | Recalled after hesitation |
 | `4` | Easy | Recalled immediately |
 
+After revealing an answer, the review card shows an accessible heart control in its upper-right corner. The POST action sets the desired favorite value idempotently and returns to the same revealed review card without recording a rating. The header heart opens `/favorites`, which lists only the current user's saved cards with the newest `favorited_at` first.
+
 The north-star metric implemented on the dashboard is 30-day first-attempt recall for due reviews. Hard, Good, and Easy count as successful recall. Again counts as failure. Same-day attempts after the first attempt for the same card are excluded.
 
 ## 10. PWA behavior
@@ -283,6 +295,16 @@ The app provides a manifest, application icons, standalone display mode, install
 - return the offline explanation if navigation fails;
 - never intercept or cache POST requests;
 - never promise offline ratings or imports.
+
+Draft and approved cards constrain Markdown content to the phone viewport. Long
+links, identifiers, fenced code, and table cells wrap rather than creating
+horizontal page or card scrolling. Long standalone formulas can scroll inside
+their bounded formula container without widening the page. The shell cache is
+`anki-shell-v13` so installed PWAs refresh the updated stylesheet. At phone
+widths, the brand and Favorites heart share a compact first row and the four
+primary controls share one horizontal second row. Sign out remains a CSRF-protected
+POST action inside Utils. Dropdown panels are absolutely positioned and do not
+increase header height.
 
 Any future offline-write feature requires a synchronization protocol, conflict rules, idempotency, and user-visible pending state. Do not extend the current service worker into offline database writes without that design.
 
@@ -301,13 +323,20 @@ node --check src/anki_card_app/static/service-worker.js
 
 At the handoff snapshot:
 
-- 100 tests pass;
-- total branch-aware coverage is 93.80 percent;
+- 118 tests pass;
+- total branch-aware coverage is 93.24 percent;
 - coverage threshold is 90 percent;
 - both PWA icons are valid PNG files at 192 by 192 and 512 by 512;
 - live manifest response type is `application/manifest+json`;
 - live service-worker response includes `Cache-Control: no-cache` and `Service-Worker-Allowed: /`;
-- Git working tree was clean after commit `6d7f7b8`.
+- Approved-card mobile release `5955a5f` passed Railway health checks, production asset verification, and a local 402 by 874 CSS-pixel browser check with no page overflow. Release `362f23f` added the same floating back-to-top control used by Drafts to the approved Cards page.
+- Production account timezone was corrected from `UTC` to `America/Los_Angeles` on 2026-08-25. Release `90999cd` makes Pacific time the new-account default and tests both UTC-7 summer and UTC-8 winter day boundaries.
+- Release `b4b3f29` deployed persistent review-card favorites through migration `20260827_0007`; production health, schema head, and `anki-shell-v10` assets were verified.
+- The compact mobile header was checked at 402 by 874 CSS pixels: all five navigation controls shared the same top coordinate, header height was 87 pixels, page scroll width equaled viewport width, and opening Create did not change header height.
+- Release `44ce0aa` deployed the compact mobile header. Railway reported success, `/ready` returned ready, and production served `anki-shell-v11` with the new horizontal mobile navigation rules.
+- The Favorites library passed 118 tests and a local PostgreSQL migration to `20260827_0008`. At 402 by 874 CSS pixels, the header remained about 87 pixels high, the Favorites heart was visible beside the brand, navigation reached `/favorites`, and page width stayed at 402 pixels without horizontal overflow.
+- Release `a3db5a6` deployed the Favorites library through migration `20260827_0008`. Railway reported success, `/ready` returned ready, production served `anki-shell-v12`, and unauthenticated `/favorites` access redirected to login.
+- Folding Sign out into Utils was checked at 402 by 874 CSS pixels. The second row contained four primary controls, Sign out remained a visible POST form inside the open Utils menu, header height stayed about 87 pixels, and page width remained 402 pixels.
 
 Tests use an isolated SQLite database through fixtures. Production-like PostgreSQL constraints and deployment behavior still need dedicated acceptance testing.
 
@@ -329,7 +358,10 @@ Tests use an isolated SQLite database through fixtures. Production-like PostgreS
 - No implemented 30-day card-frequency metric for cards reviewed at least five times.
 - No source and card deletion workflow.
 - No provider privacy notice or data-retention disclosure.
-- No mobile browser end-to-end test or formal accessibility pass.
+- No automated mobile browser end-to-end test or formal accessibility pass. A
+  manual 402 by 874 CSS-pixel draft-page check passed with long identifiers,
+  URLs, Markdown code, and table-like content, with page and card scroll widths
+  equal to their visible widths.
 
 ### Deliberately deferred product scope
 

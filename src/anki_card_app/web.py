@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, NoReturn
 
@@ -26,6 +27,7 @@ from anki_card_app.card_service import (
     get_current_version,
     get_owned_card,
     reject_card,
+    set_card_favorite,
 )
 from anki_card_app.database import get_session
 from anki_card_app.markdown import render_markdown
@@ -35,6 +37,8 @@ from anki_card_app.models import (
     CardType,
     CardVersion,
     ReviewSession,
+    SourceChunk,
+    SourceDocument,
 )
 from anki_card_app.review_service import (
     ReviewError,
@@ -97,16 +101,64 @@ def card_views_for_state(
     return [make_card_view(card, version) for card, version in rows]
 
 
+def favorite_card_views(session: Session, *, user_id: uuid.UUID) -> list[CardView]:
+    rows = session.execute(
+        select(Card, CardVersion)
+        .join(CardVersion, CardVersion.id == Card.current_version_id)
+        .where(Card.user_id == user_id, Card.is_favorite.is_(True))
+        .order_by(Card.favorited_at.desc(), Card.id)
+    ).all()
+    return [make_card_view(card, version) for card, version in rows]
+
+
+def _timestamp(value: datetime) -> float:
+    normalized = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+    return normalized.timestamp()
+
+
+def _source_excerpt_position(chunk: SourceChunk | None, version: CardVersion) -> int:
+    if chunk is None or not version.source_excerpt:
+        return 0
+    position = chunk.text.find(version.source_excerpt)
+    return position if position >= 0 else len(chunk.text)
+
+
+def draft_card_views(session: Session, *, user_id: uuid.UUID) -> list[CardView]:
+    query_rows = session.execute(
+        select(Card, CardVersion, SourceChunk, SourceDocument)
+        .join(CardVersion, CardVersion.id == Card.current_version_id)
+        .outerjoin(SourceChunk, SourceChunk.id == Card.source_chunk_id)
+        .outerjoin(SourceDocument, SourceDocument.id == Card.source_document_id)
+        .where(Card.user_id == user_id, Card.state == CardState.DRAFT)
+    ).all()
+    rows: list[tuple[Card, CardVersion, SourceChunk | None, SourceDocument | None]] = [
+        (card, version, chunk, document) for card, version, chunk, document in query_rows
+    ]
+
+    def source_order(
+        row: tuple[Card, CardVersion, SourceChunk | None, SourceDocument | None],
+    ) -> tuple[float, str, int, int, float, str]:
+        card, version, chunk, document = row
+        batch_time = document.imported_at if document is not None else card.created_at
+        group_id = str(document.id) if document is not None else str(card.id)
+        chunk_sequence = chunk.sequence if chunk is not None else 0
+        return (
+            -_timestamp(batch_time),
+            group_id,
+            chunk_sequence,
+            _source_excerpt_position(chunk, version),
+            _timestamp(card.created_at),
+            str(card.id),
+        )
+
+    rows.sort(key=source_order)
+    return [make_card_view(card, version) for card, version, _, _ in rows]
+
+
 def adjacent_draft_id(
     session: Session, *, user_id: uuid.UUID, card_id: uuid.UUID
 ) -> uuid.UUID | None:
-    draft_ids = list(
-        session.scalars(
-            select(Card.id)
-            .where(Card.user_id == user_id, Card.state == CardState.DRAFT)
-            .order_by(Card.created_at.desc(), Card.id)
-        )
-    )
+    draft_ids = [view.card.id for view in draft_card_views(session, user_id=user_id)]
     try:
         position = draft_ids.index(card_id)
     except ValueError:
@@ -212,7 +264,7 @@ def create_card_action(
 @router.get("/cards/drafts", response_class=HTMLResponse)
 def draft_inbox(request: Request, session: SessionDependency) -> HTMLResponse:
     user_id = current_user_id(request, session)
-    cards = card_views_for_state(session, user_id=user_id, card_state=CardState.DRAFT)
+    cards = draft_card_views(session, user_id=user_id)
     return templates.TemplateResponse(
         request=request,
         name="drafts.html",
@@ -228,6 +280,36 @@ def approved_cards(request: Request, session: SessionDependency) -> HTMLResponse
         request=request,
         name="cards.html",
         context={"cards": cards},
+    )
+
+
+@router.get("/favorites", response_class=HTMLResponse)
+def favorite_cards(request: Request, session: SessionDependency) -> HTMLResponse:
+    user_id = current_user_id(request, session)
+    cards = favorite_card_views(session, user_id=user_id)
+    return templates.TemplateResponse(
+        request=request,
+        name="favorites.html",
+        context={"cards": cards},
+    )
+
+
+@router.get("/cards/{card_id}", response_class=HTMLResponse)
+def card_preview(
+    request: Request,
+    card_id: uuid.UUID,
+    session: SessionDependency,
+) -> HTMLResponse:
+    user_id = current_user_id(request, session)
+    try:
+        card = get_owned_card(session, user_id=user_id, card_id=card_id)
+        version = get_current_version(session, card)
+    except CardError as error:
+        raise_http_card_error(error)
+    return templates.TemplateResponse(
+        request=request,
+        name="card_preview.html",
+        context={"card_view": make_card_view(card, version)},
     )
 
 
@@ -295,7 +377,9 @@ def edit_card_action(
             },
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
-    destination = draft_destination(card.id) if card.state is CardState.DRAFT else "/review"
+    destination = (
+        draft_destination(card.id) if card.state is CardState.DRAFT else f"/cards/{card.id}"
+    )
     return RedirectResponse(destination, status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -327,6 +411,28 @@ def reject_card_action(
         session.rollback()
         raise_http_card_error(error)
     return RedirectResponse(draft_destination(next_card_id), status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/cards/{card_id}/favorite", dependencies=[Depends(validate_csrf)])
+def favorite_card_action(
+    request: Request,
+    card_id: uuid.UUID,
+    favorite: Annotated[bool, Form()],
+    session: SessionDependency,
+) -> RedirectResponse:
+    user_id = current_user_id(request, session)
+    try:
+        set_card_favorite(
+            session,
+            user_id=user_id,
+            card_id=card_id,
+            is_favorite=favorite,
+        )
+        session.commit()
+    except CardError as error:
+        session.rollback()
+        raise_http_card_error(error)
+    return RedirectResponse("/review", status_code=status.HTTP_303_SEE_OTHER)
 
 
 def raise_http_review_error(error: ReviewError) -> NoReturn:

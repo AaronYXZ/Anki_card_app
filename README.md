@@ -1,72 +1,76 @@
 # Anki Card App
 
-An AI-assisted spaced-repetition platform for machine learning interview preparation. It turns Markdown and Obsidian notes into reviewable flashcard drafts, keeps the learner in control of approval and editing, and schedules approved cards with FSRS-6.
+[简体中文](README-CN.md)
 
-## Product status
+An AI-assisted spaced-repetition system for machine learning interview preparation. It
+turns Markdown or Obsidian notes into card drafts, keeps approval under user control, and
+schedules approved cards with FSRS-6.
 
-The local MVP core loop is working:
+Production: <https://web-production-a42e0.up.railway.app>
+
+## Current status
+
+The core workflow is deployed and has passed Mac and iPhone synchronization acceptance:
 
 ```text
-Markdown note
+Markdown notes
     -> AI-generated drafts
-    -> human approval or editing
+    -> human approval, editing, or rejection
     -> daily review queue
-    -> Again, Hard, Good, or Easy rating
-    -> persistent FSRS schedule and review history
+    -> Again, Hard, Good, or Easy
+    -> PostgreSQL review history and FSRS scheduling
 ```
 
-Implemented capabilities:
+The current version supports Markdown and ZIP imports, Normal/Cloze/Skeleton Recall cards,
+syntax highlighting, LaTeX formula rendering, source-ordered draft review, approved-card
+editing, persistent card favorites, FSRS-6 scheduling, complete JSON backup and restore,
+and PWA installation. All learning-data routes require authentication, and every write is
+protected by CSRF validation.
 
-- import one Markdown file or a ZIP containing Markdown files;
-- track imported note snapshots and their generated cards;
-- split notes into heading-aware source chunks;
-- generate Normal, Cloze, and Skeleton Recall cards;
-- choose Terra or Luna for each import;
-- show per-chunk generation progress and actionable provider errors;
-- resume failed or stalled generation without duplicating successful cards;
-- review, edit, approve, or reject every draft before it enters learning;
-- preserve Markdown from imported notes and safely render Markdown in generated or manual cards;
-- syntax-highlight recognized fenced code languages such as Python;
-- browse and edit approved cards from the Cards library;
-- keep Skeleton Recall prompts at normal weight unless Markdown explicitly adds emphasis;
-- group navigation into Create, Review, Modify, and Utils categories;
-- create a due-first daily queue that reserves 10 Normal and 3 Skeleton Recall reviews when the user's limit and available due cards allow it;
-- jump directly to the top of the draft inbox with a floating button;
-- persist idempotent FSRS-6 reviews and complete scheduling history;
-- show daily counts and a 30-day first-attempt recall metric;
-- install the interface as a PWA on supported mobile and desktop browsers;
-- authenticate private-alpha users with revocable server-side sessions;
-- isolate every existing notes, cards, imports, reviews, and metrics route by request identity;
-- require Session-bound CSRF tokens for every mutation;
-- escape user and model content as text and enforce restrictive browser security headers;
-- deploy with Railway config-as-code, migration gating, and database readiness checks;
-- export all owned learning data as a portable JSON backup;
-- use `Space` to reveal an answer and `1` through `4` to rate it.
+## Installation and use
 
-This is not yet private-alpha ready. Authentication, authorization, CSRF, CSP,
-and text-rendering boundaries are implemented, but invite acceptance, password
-recovery, login rate limits, durable background jobs, live production deployment,
-database restoration, and full mobile or accessibility acceptance testing remain open.
+End users do not need to download the source code. The website and installed PWA use the
+same cloud account and database.
 
-## Technology
+### iPhone
 
-| Layer | Choice |
+1. Open the production URL in Safari and sign in.
+2. Tap Safari's Share button.
+3. Select **Add to Home Screen**.
+4. Open Anki Card App from the Home Screen.
+
+### Mac
+
+Use the app directly in Safari or another browser, or install it as a PWA:
+
+1. Open the production URL in Safari and sign in.
+2. Select **File > Add to Dock**.
+3. Open the app from the Dock or Applications.
+
+The Mac website, Mac PWA, and iPhone PWA have the same features. The current version needs
+a network connection to import, approve, edit, or review. Static pages may be cached, but
+offline review writes are not implemented.
+
+### First use
+
+1. Open **Create > Import** and upload a Markdown file or a ZIP containing Markdown files.
+2. Wait for AI card-draft generation to finish.
+3. Open **Modify > Drafts** and approve, edit, or reject the drafts.
+4. Open **Review** and complete the day's queue.
+5. Open **Utils > Export** and download the first JSON backup.
+
+## Local development setup
+
+### Requirements
+
+| Tool | Purpose |
 |---|---|
-| Application | Python 3.12, FastAPI |
-| UI | Server-rendered Jinja, CSS, targeted JavaScript |
-| Database | PostgreSQL, SQLAlchemy 2, Alembic |
-| Scheduling | Py-FSRS, FSRS-6 |
-| AI generation | OpenAI Responses API with structured output |
-| Packaging | `uv` and `pyproject.toml` |
-| Testing | Pytest, Ruff, Mypy, coverage |
+| Python 3.12+ | Application runtime |
+| `uv` | Python dependency and command management |
+| Docker Compose | Local PostgreSQL |
+| OpenAI API key | Required only for AI card generation |
 
-## Local setup
-
-Requirements:
-
-- `uv`
-- Docker with Compose
-- an OpenAI API key for AI card generation
+### Start the application
 
 ```bash
 cp .env.example .env
@@ -76,139 +80,262 @@ uv run alembic upgrade head
 uv run uvicorn anki_card_app.main:app --reload
 ```
 
-Add the API key to `.env` without quotes:
+Open <http://localhost:8000>.
+
+To enable AI generation, add the key to `.env` without quotes:
 
 ```dotenv
 OPENAI_API_KEY=your_api_key_here
 ```
 
-Do not commit `.env`. Restart the application after changing environment variables.
+Restart the application after changing `.env`. The file contains secrets and must never be
+committed. Manual card creation, review, export, and restore remain available without an API
+key.
 
-Local development defaults to `AUTH_MODE=development`, which explicitly keeps
-the fixed development account. To exercise password authentication locally:
+Local development defaults to `AUTH_MODE=development`. To test password authentication:
 
 ```bash
-uv run alembic upgrade head
 uv run anki-card-admin create-user --email you@example.com
 ```
 
-Then change `.env` and restart Uvicorn:
+Then update `.env` and restart the application:
 
 ```dotenv
 AUTH_MODE=password
 SESSION_COOKIE_SECURE=false
 ```
 
-Open `/login`. Passwords must contain at least 12 characters. Use
-`uv run anki-card-admin set-password --email you@example.com` to change a
-password and revoke every session for that account.
+Passwords must contain at least 12 characters. Change a password with:
 
-Open these local pages:
+```bash
+uv run anki-card-admin set-password --email you@example.com
+```
 
-- App: [http://localhost:8000](http://localhost:8000)
-- Import notes: [http://localhost:8000/imports/new](http://localhost:8000/imports/new)
-- Imported notes ledger: [http://localhost:8000/notes](http://localhost:8000/notes)
-- Draft review: [http://localhost:8000/cards/drafts](http://localhost:8000/cards/drafts)
-- Daily review: [http://localhost:8000/review](http://localhost:8000/review)
-- PWA installation: [http://localhost:8000/install](http://localhost:8000/install)
-- Health check: [http://localhost:8000/health](http://localhost:8000/health)
-- Database readiness: [http://localhost:8000/ready](http://localhost:8000/ready)
-- Portable JSON export: [http://localhost:8000/exports/backup.json](http://localhost:8000/exports/backup.json)
-- Portable JSON restore: [http://localhost:8000/restore](http://localhost:8000/restore)
+## Project structure
 
-## Use the product
+```text
+Anki_card_app/
+├── src/anki_card_app/
+│   ├── app.py                 # FastAPI app, static resources, and PWA routes
+│   ├── main.py                # ASGI entry point
+│   ├── models.py              # SQLAlchemy data model
+│   ├── database.py            # Database connection and readiness check
+│   ├── web.py                 # Card, draft, and review pages
+│   ├── imports_web.py         # Note upload and generation tasks
+│   ├── notes_web.py           # Imported Notes pages
+│   ├── generation.py          # Structured OpenAI card generation
+│   ├── import_service.py      # Markdown/ZIP parsing and chunking
+│   ├── card_service.py        # Card versions and lifecycle transitions
+│   ├── review_service.py      # Daily queue and atomic review writes
+│   ├── fsrs_adapter.py        # FSRS-6 state transitions
+│   ├── export_service.py      # JSON backup creation
+│   ├── restore_service.py     # JSON validation and atomic restore
+│   ├── auth*.py               # Login, sessions, and identity isolation
+│   ├── security.py            # CSRF, CSP, and security headers
+│   ├── templates/             # Jinja pages
+│   └── static/                # CSS, JavaScript, PWA resources, and icons
+├── migrations/                # Alembic database migrations
+├── tests/                     # Unit, service, and web tests
+├── docs/                      # PRD, development plan, and operations guides
+├── compose.yaml               # Local PostgreSQL
+├── railway.json               # Railway build, migration, and health checks
+└── pyproject.toml             # Dependencies, tests, and quality configuration
+```
 
-### Generate cards from a note
+Core layers:
 
-1. Set `OPENAI_API_KEY` and restart the service.
-2. Open `/imports/new`.
-3. Choose Terra or Luna.
-4. Upload a `.md` file or a ZIP archive.
-5. Watch each source chunk move from pending to completed or failed.
-6. Open Drafts and approve, edit, or reject the generated cards.
+```text
+Jinja pages and targeted JavaScript
+                |
+                v
+           FastAPI routes
+                |
+                v
+ Services: import / generation / card / review / restore
+                |
+                v
+ SQLAlchemy 2 + PostgreSQL + FSRS state
+```
 
-Generation progress is committed after every chunk. The run page refreshes every five seconds. Each provider request has a 90-second timeout, and the workflow retries a recoverable failed chunk once. Authentication, unavailable-model, and exhausted-credit errors stop the run. After fixing the problem, select **Resume generation**. The new run reuses the imported source and avoids duplicate cards through content fingerprints.
+The UI never accesses the database directly. Scheduling runs on the server, so Mac, iPhone,
+and future clients share the same learning rules.
 
-### Restore an exported backup
+## Technology stack
 
-1. Sign in to an empty account.
-2. Open `/restore`.
-3. Select a JSON file downloaded from `Export`.
-4. Confirm the empty-account warning and restore.
+| Layer | Technology | Responsibility |
+|---|---|---|
+| Backend | Python 3.12, FastAPI, Uvicorn | Pages, authentication, and business routes |
+| Frontend | Jinja, CSS, targeted JavaScript | Lightweight server-rendered PWA |
+| Data | PostgreSQL, SQLAlchemy 2, Alembic | Cloud state and database migrations |
+| Scheduling | Py-FSRS, FSRS-6 | Next-review calculation |
+| AI | OpenAI Responses API, Pydantic structured output | Structured drafts from notes |
+| Content | markdown-it-py, Pygments, latex2mathml | Safe Markdown, syntax highlighting, and MathML formulas |
+| Engineering | uv, Pytest, Ruff, Mypy, coverage | Dependencies, tests, and static checks |
+| Deployment | Railway, Railpack, GitHub | Web service, PostgreSQL, and releases |
 
-Restore recreates source notes, generation runs, drafts, every card version,
-scheduling state, review sessions, and review logs in one transaction. IDs and
-review attempt identifiers are remapped to avoid collisions. The signed-in
-account keeps its email, password, and sessions. Its learning preferences are
-restored from the backup. A non-empty account is rejected instead of being
-overwritten or merged.
+## How Mac and iPhone share data
 
-### Review cards
+```text
+Mac Browser / PWA ----\
+                       \
+iPhone Safari / PWA ---- HTTPS ---> FastAPI ---> Railway PostgreSQL
+                       /
+Other Browser --------/
+```
 
-1. Approve at least one draft.
-2. Open `/review`.
-3. Attempt recall before revealing the answer.
-4. Select Again, Hard, Good, or Easy.
-5. Complete the queue and inspect the session summary.
+Synchronization has four essential properties:
 
-The rating mapping is standard FSRS: Again `1`, Hard `2`, Good `3`, Easy `4`. Review submission uses a unique attempt identifier so a retry cannot create a second review event.
+1. Both devices sign in to the same production account.
+2. PostgreSQL stores every card, draft, review event, and schedule.
+3. Every approval, edit, and rating is sent to FastAPI and written on the server.
+4. The other device reads the latest state from the same PostgreSQL database after refresh.
 
-### Install the PWA
+Devices do not exchange files directly and do not depend on iCloud for application-state
+synchronization. Each device has an independent login session, so signing out on one device
+does not automatically sign out the other.
 
-Open `/install` for platform-specific instructions. The application shell and static assets are cached. Imports, approvals, ratings, and all other data writes require a connection to the server. Offline review writes are intentionally unsupported.
+A review transaction stores both the review log and the updated FSRS schedule atomically.
+An `attempt_id` prevents a network retry from recording the same rating twice. The current
+version does not have IndexedDB offline writes, conflict resolution, or background sync. Do
+not continue reviewing while offline.
 
-### Deploy and synchronize devices
+Daily review totals reset at midnight in `America/Los_Angeles`. The IANA timezone handles
+Pacific Daylight Time, UTC-7, and Pacific Standard Time, UTC-8, automatically. Database
+timestamps remain stored in UTC.
 
-See [Railway Deployment and Sync Acceptance](docs/RAILWAY_DEPLOYMENT.md). The
-shared PostgreSQL database is the V1 synchronization source. Mac and iPhone do
-not synchronize directly with each other.
+See [Railway Deployment and Sync Acceptance](docs/RAILWAY_DEPLOYMENT.md) for the deployment
+and acceptance runbook.
+
+## Data backup and restore
+
+### Recommended low-cost approach
+
+The current Railway dashboard exposes native Backups and PITR only on the Pro plan. Users on
+other plans should use the application's portable JSON backup. Do not delete, recreate, or
+overwrite the production database to test a restore.
+
+Create a backup:
+
+1. Sign in to production.
+2. Open **Utils > Export**.
+3. Download a file such as `anki-card-app-2026-08-17.json`.
+4. Store it in private iCloud Drive, an encrypted disk, or another protected location.
+5. Export weekly and after large imports or editing sessions.
+
+The JSON backup contains:
+
+| Data | Included |
+|---|---|
+| Imported notes and chunks | Yes |
+| Generation records, drafts, cards, and every card version | Yes |
+| FSRS schedules, review sessions, and review logs | Yes |
+| User timezone and learning preferences | Yes |
+| Password hash, session token, and OpenAI API key | No |
+
+The file still contains the account email, source notes, and learning content. Treat it as
+private data and never commit it to GitHub.
+
+### Restore a JSON backup
+
+1. Sign in to an empty account with no learning data.
+2. Open **Utils > Restore**.
+3. Select a version 1 JSON file exported by this application.
+4. Confirm the empty-account warning and start the restore.
+5. Verify notes, drafts, cards, due state, and review history.
+
+Restore fully validates the file before writing everything in one database transaction. An
+error rolls back the transaction, so a partial restore is never retained. Restore keeps the
+signed-in account's email, password, and sessions while importing learning data and
+preferences.
+
+Important limitation: restore accepts only an empty account. Merge, selective restore, and
+overwrite restore are not implemented.
+
+### Railway Pro
+
+If the project later upgrades to Railway Pro, enable native volume snapshots and PITR from
+the PostgreSQL service's **Backups** page. Keep portable JSON exports even with native
+backups because JSON is easier to migrate to another provider.
+
+## Core product rules
+
+| Rule | Current behavior |
+|---|---|
+| AI generation | Produces drafts only and never enters review automatically |
+| Review history | Append-only, with no overwritten historical ratings |
+| Card edits | Append an immutable CardVersion |
+| Favorites | Persist on the Card and synchronize across signed-in devices |
+| Daily queue | Targets at least 10 Normal and 3 Skeleton Recall when possible |
+| Skeleton prompt | Bold only when explicitly marked with Markdown |
+| Markdown | Rejects raw HTML and unsafe links |
+| Math | Converts LaTeX to allowlisted MathML on the server |
+| Offline | Caches static resources but rejects offline writes |
+
+## Markdown and formulas
+
+Drafts, approved cards, and review cards use the same renderer. Use `$...$` for an inline
+formula and `$$...$$` for a standalone formula:
+
+```text
+The adjusted value is $Y_{adj}$.
+
+$$
+Y_{adj} = Y - \theta \cdot (X - \bar{X})
+$$
+```
+
+The `\(...\)` and `\[...\]` delimiters are also supported. A standalone line containing
+LaTeX commands is recognized without delimiters, so this line also renders as a formula:
+
+```text
+Y_{adj} = Y - \theta \cdot (X - \bar{X})
+```
+
+Imported notes retain their existing delimiters. AI-generated cards are instructed to wrap
+new formulas in delimiters. Code spans and fenced code blocks remain code and are never
+interpreted as formulas.
 
 ## Configuration
 
-See [.env.example](.env.example) for every setting. The most important values are:
+See [.env.example](.env.example) for every setting. Production requires at least:
 
-| Variable | Purpose | Default |
-|---|---|---|
-| `AUTH_MODE` | Explicit development bypass or password authentication | `development` |
-| `SESSION_COOKIE_NAME` | Authentication cookie name | `anki_session` |
-| `CSRF_COOKIE_NAME` | Pre-login and development CSRF cookie name | `anki_csrf` |
-| `SESSION_LIFETIME_DAYS` | Absolute session lifetime | `30` |
-| `SESSION_COOKIE_SECURE` | Restrict the cookie to HTTPS | `false` |
-| `DATABASE_URL` | PostgreSQL connection | local Compose database on port 5433 |
-| `OPENAI_API_KEY` | Enables card generation | empty |
-| `OPENAI_MODEL` | Default import model | `gpt-5.6-terra` |
-| `OPENAI_TIMEOUT_SECONDS` | Provider request timeout | `90` |
-| `MAX_UPLOAD_BYTES` | Uploaded file limit | `10000000` |
-| `MAX_ARCHIVE_FILES` | ZIP entry limit | `250` |
-| `MAX_ARCHIVE_UNCOMPRESSED_BYTES` | Expanded ZIP limit | `50000000` |
+```dotenv
+APP_ENV=production
+APP_DEBUG=false
+AUTH_MODE=password
+SESSION_COOKIE_SECURE=true
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+OPENAI_API_KEY=stored_in_railway_secrets
+OPENAI_MODEL=gpt-5.6-terra
+```
 
-Terra and Luna are the only models exposed by the current import form. Confirm API access and pricing before changing this allowlist.
+Railway runs `alembic upgrade head` before deployment and uses `/ready` to verify
+PostgreSQL. A new release receives traffic only after the database is reachable. PostgreSQL
+remains private, and the web service obtains its connection string through a Railway
+reference variable.
 
-## Quality checks
+## Tests
 
 ```bash
 uv run ruff format --check src tests migrations
 uv run ruff check src tests migrations
 uv run mypy src
 uv run pytest --cov=anki_card_app --cov-report=term-missing
+node --check src/anki_card_app/static/app.js
+node --check src/anki_card_app/static/service-worker.js
 ```
 
-Current verified working-tree baseline:
+Current baseline: 117 tests passing with 93.19 percent total coverage.
 
-- 100 tests passing;
-- 93.80 percent total coverage;
-- Ruff, Mypy, JavaScript syntax, manifest parsing, and live PWA endpoint checks passing.
+## Known limitations
 
-## Important constraints
-
-- Imported notes are immutable snapshots. Source-file change detection and automatic card reconciliation are deferred.
-- AI output is always a draft. It never enters the review queue without user approval.
-- Generation currently runs in FastAPI in-process background tasks. A process restart can interrupt it.
-- The fixed account exists only in explicit development auth mode. Production settings require password auth and secure cookies.
-- Dynamic content is rendered as escaped text. Any future Markdown-to-HTML feature must introduce and test an allowlist sanitizer before using trusted markup.
-- Static assets work offline, but database writes do not.
-- JSON restore requires an empty account. Merge restore and selective restore are not implemented.
-- The application does not synchronize with Anki or scan an arbitrary Obsidian directory.
+| Area | Limitation |
+|---|---|
+| AI tasks | FastAPI in-process background tasks can be interrupted by deployment |
+| Imports | Notes are immutable snapshots, with no automatic Obsidian folder scanning |
+| Restore | Empty accounts only, with no merge restore |
+| Sync | Network connection required, with no offline writes or conflict handling |
+| Accounts | No self-service registration, password recovery, or account deletion yet |
 
 ## Documentation
 
@@ -218,4 +345,5 @@ Current verified working-tree baseline:
 - [Authentication decision and threat model](docs/AUTHENTICATION.md)
 - [Railway deployment and sync acceptance](docs/RAILWAY_DEPLOYMENT.md)
 
-The handoff specification is the canonical starting point for the next development session. It records the current architecture, invariants, known gaps, validation state, and recommended next task.
+Read `docs/SESSION_HANDOFF.md` before continuing development. It records the current
+deployment, data invariants, test baseline, and next task.
