@@ -76,6 +76,14 @@ textarea:focus, input[type="text"]:focus, input[type="email"]:focus, input[type=
 .field-help { margin: 1.5rem 0 0; padding: 0.9rem 1rem; border-left: 4px solid var(--accent); background: #edf5ef; color: var(--muted); line-height: 1.5; }
 .card-form .follow-up-fields { display: block; margin-top: 1.75rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
 .follow-up-fields legend { padding: 0; font-weight: 800; }
+.leetcode-note-summary { max-width: 48rem; margin-top: 2rem; padding: clamp(1.25rem, 4vw, 2.25rem); border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); }
+.note-fields { display: grid; gap: 0.75rem; margin: 1.25rem 0 0; }
+.note-fields div { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 1rem; }
+.note-fields dt { color: var(--muted); font-weight: 700; }
+.note-fields dd { margin: 0; }
+.existing-follow-ups { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.existing-follow-ups details { padding: 0.75rem 0; }
+.existing-follow-ups summary { cursor: pointer; font-weight: 700; }
 .card-form input[type="file"] { width: 100%; padding: 0.8rem; border: 1px dashed var(--line); border-radius: 0.6rem; background: white; }
 .muted, small { color: var(--muted); }
 .notice.error { max-width: 48rem; margin-top: 1rem; padding: 1rem; border-left: 4px solid var(--danger); background: #fff1ef; }

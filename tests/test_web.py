@@ -31,8 +31,8 @@ def test_dashboard_and_empty_workflows(client: TestClient) -> None:
 
     assert dashboard.status_code == 200
     assert "0 cards are ready" in dashboard.text
-    assert '/static/app.css?v=15' in dashboard.text
-    assert '/static/app.js?v=15' in dashboard.text
+    assert '/static/app.css?v=16' in dashboard.text
+    assert '/static/app.js?v=16' in dashboard.text
     assert "30-day first-attempt recall" in dashboard.text
     assert "N/A" in dashboard.text
     assert "No drafts waiting" in drafts.text
@@ -78,6 +78,65 @@ def test_leetcode_form_creates_pattern_python_and_follow_up_drafts(
     drafts = client.get("/cards/drafts")
     assert "leetcode · pattern" in drafts.text
     assert "What if negatives are allowed?" in drafts.text
+
+    pattern_card = next(card for card in cards if card.template_key == "pattern")
+    edit_from_drafts = client.get(f"/cards/{pattern_card.id}/edit")
+    assert edit_from_drafts.status_code == 200
+    assert "Add a follow-up" in edit_from_drafts.text
+    assert "What if negatives are allowed?" in edit_from_drafts.text
+
+    added_from_drafts = client.post(
+        f"/cards/{pattern_card.id}/edit",
+        data={
+            "follow_up_question": "Can we return the matching subarray?",
+            "follow_up_answer": "Track the best left and right boundaries.",
+        },
+        follow_redirects=False,
+    )
+    assert added_from_drafts.status_code == 303
+    added_card = db_session.scalar(select(Card).where(Card.template_key == "follow_up_2"))
+    assert added_card is not None
+    assert added_from_drafts.headers["location"] == f"/cards/drafts#card-{added_card.id}"
+
+    client.post(f"/cards/{pattern_card.id}/approve")
+    cards_page = client.get("/cards")
+    assert f'href="/cards/{pattern_card.id}/edit"' in cards_page.text
+    edit_from_cards = client.get(f"/cards/{pattern_card.id}/edit")
+    assert "Create follow-up draft" in edit_from_cards.text
+    assert 'href="/cards"' in edit_from_cards.text
+
+    added_from_cards = client.post(
+        f"/cards/{pattern_card.id}/edit",
+        data={
+            "follow_up_question": "What if the input is a stream?",
+            "follow_up_answer": "The answer depends on whether old values can be retained.",
+        },
+        follow_redirects=False,
+    )
+    assert added_from_cards.status_code == 303
+    assert db_session.scalar(select(Card).where(Card.template_key == "follow_up_3")) is not None
+
+
+def test_leetcode_form_accepts_an_empty_invariant(
+    client: TestClient, db_session: Session
+) -> None:
+    response = client.post(
+        "/cards/new",
+        data={
+            "card_type": "leetcode",
+            "problem_id": "LC-1 Two Sum",
+            "problem_summary": "Return indices of two values that sum to target.",
+            "pattern": "Hash map",
+            "invariant": "",
+            "base_approach": "Store each seen value and its index.",
+            "python_skeleton": "def two_sum(nums: list[int], target: int) -> list[int]:\n    pass",
+            "complexity": "Time O(n), space O(n)",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert db_session.scalar(select(Card).where(Card.template_key == "pattern")) is not None
 
 
 def test_primary_navigation_is_grouped_into_four_categories(client: TestClient) -> None:

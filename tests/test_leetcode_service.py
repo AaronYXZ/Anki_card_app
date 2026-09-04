@@ -6,11 +6,17 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from anki_card_app.card_service import CardValidationError, approve_card, get_current_version
+from anki_card_app.card_service import (
+    CardNotFoundError,
+    CardValidationError,
+    approve_card,
+    get_current_version,
+)
 from anki_card_app.export_service import build_user_export
 from anki_card_app.leetcode_service import (
     LeetCodeFollowUp,
     LeetCodeNoteContent,
+    add_leetcode_follow_up,
     create_leetcode_note,
 )
 from anki_card_app.models import Card, NoteType, StudyNote, UserAccount
@@ -65,6 +71,74 @@ def test_leetcode_note_generates_only_nonempty_sibling_cards(
     assert "```python" in (python.back or "")
     assert "negative numbers" in (follow_up.front or "")
     assert "monotonic deque" in (follow_up.back or "")
+
+
+def test_leetcode_invariant_is_optional(db_session: Session, user: UserAccount) -> None:
+    original = leetcode_content()
+    content = LeetCodeNoteContent(
+        problem_id=original.problem_id,
+        problem_summary=original.problem_summary,
+        pattern=original.pattern,
+        invariant="",
+        base_approach=original.base_approach,
+        python_skeleton=original.python_skeleton,
+        complexity=original.complexity,
+    )
+
+    result = create_leetcode_note(db_session, user_id=user.id, content=content)
+
+    assert result.note.fields["invariant"] == ""
+    pattern = get_current_version(db_session, result.cards[0])
+    python = get_current_version(db_session, result.cards[1])
+    assert "Invariant" not in (pattern.front or "")
+    assert "**Invariant:**" not in (pattern.back or "")
+    assert "Explain the approach before coding" in (python.front or "")
+
+
+def test_add_follow_up_updates_note_and_creates_next_draft_sibling(
+    db_session: Session, user: UserAccount
+) -> None:
+    result = create_leetcode_note(db_session, user_id=user.id, content=leetcode_content())
+
+    new_card = add_leetcode_follow_up(
+        db_session,
+        user_id=user.id,
+        note_id=result.note.id,
+        follow_up=LeetCodeFollowUp(
+            question="How would you return the selected subarray?",
+            answer="Track the best left and right boundaries when updating the answer.",
+        ),
+    )
+    db_session.commit()
+
+    db_session.refresh(result.note)
+    assert new_card.template_key == "follow_up_2"
+    assert new_card.state.value == "draft"
+    assert len(result.note.fields["follow_ups"]) == 2
+    assert result.note.fields["follow_ups"][1]["question"].startswith("How would")
+    version = get_current_version(db_session, new_card)
+    assert "return the selected subarray" in (version.front or "")
+
+
+def test_add_follow_up_requires_complete_content_and_note_ownership(
+    db_session: Session, user: UserAccount
+) -> None:
+    result = create_leetcode_note(db_session, user_id=user.id, content=leetcode_content())
+
+    with pytest.raises(CardValidationError, match="requires both"):
+        add_leetcode_follow_up(
+            db_session,
+            user_id=user.id,
+            note_id=result.note.id,
+            follow_up=LeetCodeFollowUp(question="Missing answer"),
+        )
+    with pytest.raises(CardNotFoundError, match="not found"):
+        add_leetcode_follow_up(
+            db_session,
+            user_id=uuid.uuid4(),
+            note_id=result.note.id,
+            follow_up=LeetCodeFollowUp(question="Question", answer="Answer"),
+        )
 
 
 def test_leetcode_note_validates_pairs_and_duplicate_problem_ids(

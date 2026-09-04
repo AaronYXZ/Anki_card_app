@@ -33,7 +33,10 @@ from anki_card_app.database import get_session
 from anki_card_app.leetcode_service import (
     LeetCodeFollowUp,
     LeetCodeNoteContent,
+    add_leetcode_follow_up,
     create_leetcode_note,
+    get_owned_leetcode_note,
+    leetcode_content_from_note,
 )
 from anki_card_app.markdown import render_markdown
 from anki_card_app.models import (
@@ -375,6 +378,18 @@ def edit_card_form(
     user_id = current_user_id(request, session)
     try:
         card = get_owned_card(session, user_id=user_id, card_id=card_id)
+        if card.note_id is not None:
+            note = get_owned_leetcode_note(session, user_id=user_id, note_id=card.note_id)
+            return templates.TemplateResponse(
+                request=request,
+                name="leetcode_note_form.html",
+                context={
+                    "card": card,
+                    "content": leetcode_content_from_note(note),
+                    "error": None,
+                    "form_values": {},
+                },
+            )
         version = get_current_version(session, card)
     except CardError as error:
         raise_http_card_error(error)
@@ -394,10 +409,23 @@ def edit_card_action(
     back: Annotated[str, Form()] = "",
     cloze_text: Annotated[str, Form()] = "",
     back_extra: Annotated[str, Form()] = "",
+    follow_up_question: Annotated[str, Form()] = "",
+    follow_up_answer: Annotated[str, Form()] = "",
 ) -> Response:
     user_id = current_user_id(request, session)
     try:
         card = get_owned_card(session, user_id=user_id, card_id=card_id)
+        if card.note_id is not None:
+            new_card = add_leetcode_follow_up(
+                session,
+                user_id=user_id,
+                note_id=card.note_id,
+                follow_up=LeetCodeFollowUp(follow_up_question, follow_up_answer),
+            )
+            session.commit()
+            return RedirectResponse(
+                draft_destination(new_card.id), status_code=status.HTTP_303_SEE_OTHER
+            )
         edit_card(
             session,
             user_id=user_id,
@@ -414,6 +442,22 @@ def edit_card_action(
         session.rollback()
         if isinstance(error, CardNotFoundError):
             raise_http_card_error(error)
+        if card.note_id is not None:
+            note = get_owned_leetcode_note(session, user_id=user_id, note_id=card.note_id)
+            return templates.TemplateResponse(
+                request=request,
+                name="leetcode_note_form.html",
+                context={
+                    "card": card,
+                    "content": leetcode_content_from_note(note),
+                    "error": str(error),
+                    "form_values": {
+                        "follow_up_question": follow_up_question,
+                        "follow_up_answer": follow_up_answer,
+                    },
+                },
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            )
         return templates.TemplateResponse(
             request=request,
             name="card_form.html",

@@ -38,7 +38,7 @@
         <label>Problem ID <input type="text" name="problem_id" value="{{ form_values.problem_id if form_values is defined else '' }}" placeholder="LC-209 Minimum Size Subarray Sum"></label>
         <label>Problem summary <textarea name="problem_summary" rows="4" placeholder="Find the shortest subarray whose sum is at least target. All numbers are positive.">{{ form_values.problem_summary if form_values is defined else '' }}</textarea></label>
         <label>Pattern <input type="text" name="pattern" value="{{ form_values.pattern if form_values is defined else '' }}" placeholder="Variable sliding window"></label>
-        <label>Invariant <textarea name="invariant" rows="3" placeholder="The current window is the smallest valid window ending at right after shrinking.">{{ form_values.invariant if form_values is defined else '' }}</textarea></label>
+        <label>Invariant <span class="muted">optional</span><textarea name="invariant" rows="3" placeholder="The current window is the smallest valid window ending at right after shrinking.">{{ form_values.invariant if form_values is defined else '' }}</textarea></label>
         <label>Base approach <textarea name="base_approach" rows="5">{{ form_values.base_approach if form_values is defined else '' }}</textarea></label>
         <label>Python skeleton <textarea name="python_skeleton" rows="10" placeholder="def min_sub_array_len(target: int, nums: list[int]) -> int:">{{ form_values.python_skeleton if form_values is defined else '' }}</textarea></label>
         <label>Complexity <input type="text" name="complexity" value="{{ form_values.complexity if form_values is defined else '' }}" placeholder="Time O(n), space O(1)"></label>

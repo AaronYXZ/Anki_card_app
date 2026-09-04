@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Add LeetCode follow-up · Anki Card App{% endblock %}
+{% block content %}
+  <section class="page-heading">
+    <p class="eyebrow">Shared LeetCode note</p>
+    <h1>Add a follow-up</h1>
+    <p>The new follow-up becomes an independent draft sibling. Existing cards and their schedules remain unchanged.</p>
+  </section>
+  {% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
+  <article class="leetcode-note-summary">
+    <div class="card-meta"><span class="pill">leetcode</span><span>{{ content.problem_id }}</span></div>
+    <div class="markdown-content">
+      <h2>Problem</h2>
+      {{ content.problem_summary|markdown }}
+      <dl class="note-fields">
+        <div><dt>Pattern</dt><dd>{{ content.pattern }}</dd></div>
+        {% if content.invariant %}<div><dt>Invariant</dt><dd>{{ content.invariant }}</dd></div>{% endif %}
+        <div><dt>Complexity</dt><dd>{{ content.complexity }}</dd></div>
+      </dl>
+    </div>
+    {% if content.follow_ups %}
+      <section class="existing-follow-ups">
+        <h2>Existing follow-ups</h2>
+        {% for follow_up in content.follow_ups %}
+          <details>
+            <summary>{{ loop.index }}. {{ follow_up.question }}</summary>
+            <div class="markdown-content">{{ follow_up.answer|markdown }}</div>
+          </details>
+        {% endfor %}
+      </section>
+    {% endif %}
+  </article>
+  <form method="post" class="card-form">
+    <input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}">
+    <label>Follow-up question <textarea name="follow_up_question" rows="3" placeholder="What changes if negative numbers are allowed?">{{ form_values.follow_up_question or '' }}</textarea></label>
+    <label>Follow-up answer <textarea name="follow_up_answer" rows="8" placeholder="1. Changed assumption&#10;2. What breaks&#10;3. Replacement approach&#10;4. New invariant&#10;5. Complexity&#10;6. Implementation changes">{{ form_values.follow_up_answer or '' }}</textarea></label>
+    <div class="actions">
+      <button class="button primary" type="submit">Create follow-up draft</button>
+      <a class="button" href="{{ '/cards/drafts' if card.state.value == 'draft' else '/cards' }}">Cancel</a>
+    </div>
+  </form>
+{% endblock %}
