@@ -205,6 +205,7 @@ def test_favorites_page_is_user_scoped_and_newest_first(
     other.is_favorite = True
     other.favorited_at = datetime(2026, 8, 27, 13, tzinfo=UTC)
     db_session.commit()
+    client.post(f"/cards/{newer.id}/approve")
 
     page = client.get("/favorites")
 
@@ -215,7 +216,31 @@ def test_favorites_page_is_user_scoped_and_newest_first(
     assert "Other user's favorite" not in page.text
     assert f'href="/cards/{newer.id}"' in page.text
     assert f'href="/cards/{newer.id}/edit"' in page.text
+    assert f'action="/favorites/{newer.id}/unlike"' in page.text
+    assert f'action="/favorites/{newer.id}/delete"' in page.text
+    assert ">Unlike</button>" in page.text
+    assert ">Delete</button>" in page.text
+    assert "Delete this card from learning?" in page.text
     assert hidden.is_favorite is False
+
+    unlike = client.post(f"/favorites/{older.id}/unlike", follow_redirects=False)
+    assert unlike.status_code == 303
+    assert unlike.headers["location"] == "/favorites"
+    db_session.refresh(older)
+    assert older.is_favorite is False
+    assert older.state is CardState.DRAFT
+
+    deleted = client.post(f"/favorites/{newer.id}/delete", follow_redirects=False)
+    assert deleted.status_code == 303
+    assert deleted.headers["location"] == "/favorites"
+    db_session.refresh(newer)
+    assert newer.is_favorite is False
+    assert newer.state is CardState.RETIRED
+
+    updated_page = client.get("/favorites")
+    assert "Older favorite" not in updated_page.text
+    assert "Newer favorite" not in updated_page.text
+    assert "Newer favorite" not in client.get("/review").text
 
 
 def test_normal_card_create_edit_approve_and_review(

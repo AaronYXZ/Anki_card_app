@@ -27,6 +27,7 @@ from anki_card_app.card_service import (
     get_current_version,
     get_owned_card,
     reject_card,
+    remove_card_from_learning,
     set_card_favorite,
 )
 from anki_card_app.database import get_session
@@ -348,6 +349,39 @@ def favorite_cards(request: Request, session: SessionDependency) -> HTMLResponse
         name="favorites.html",
         context={"cards": cards},
     )
+
+
+@router.post("/favorites/{card_id}/unlike", dependencies=[Depends(validate_csrf)])
+def unlike_favorite_card(
+    request: Request, card_id: uuid.UUID, session: SessionDependency
+) -> RedirectResponse:
+    user_id = current_user_id(request, session)
+    try:
+        set_card_favorite(
+            session,
+            user_id=user_id,
+            card_id=card_id,
+            is_favorite=False,
+        )
+        session.commit()
+    except CardError as error:
+        session.rollback()
+        raise_http_card_error(error)
+    return RedirectResponse("/favorites", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/favorites/{card_id}/delete", dependencies=[Depends(validate_csrf)])
+def delete_favorite_card(
+    request: Request, card_id: uuid.UUID, session: SessionDependency
+) -> RedirectResponse:
+    user_id = current_user_id(request, session)
+    try:
+        remove_card_from_learning(session, user_id=user_id, card_id=card_id)
+        session.commit()
+    except CardError as error:
+        session.rollback()
+        raise_http_card_error(error)
+    return RedirectResponse("/favorites", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/cards/{card_id}", response_class=HTMLResponse)

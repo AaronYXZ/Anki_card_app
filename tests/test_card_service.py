@@ -16,6 +16,7 @@ from anki_card_app.card_service import (
     get_current_version,
     get_owned_card,
     reject_card,
+    remove_card_from_learning,
     resume_card,
     retire_card,
     set_card_favorite,
@@ -147,6 +148,25 @@ def test_card_favorite_is_persistent_idempotent_and_user_scoped(
             card_id=card.id,
             is_favorite=False,
         )
+
+
+def test_remove_card_from_learning_retires_and_unfavorites_card(
+    db_session: Session, user_id: uuid.UUID
+) -> None:
+    card = create_normal_draft(db_session, user_id)
+    approve_card(db_session, user_id=user_id, card_id=card.id)
+    set_card_favorite(db_session, user_id=user_id, card_id=card.id, is_favorite=True)
+
+    removed = remove_card_from_learning(db_session, user_id=user_id, card_id=card.id)
+
+    assert removed.state is CardState.RETIRED
+    assert removed.is_favorite is False
+    assert removed.favorited_at is None
+    assert db_session.get(SchedulingState, card.id) is not None
+    assert db_session.scalars(select(CardVersion).where(CardVersion.card_id == card.id)).all()
+
+    with pytest.raises(CardNotFoundError):
+        remove_card_from_learning(db_session, user_id=uuid.uuid4(), card_id=card.id)
 
 
 def test_create_and_edit_reject_exact_duplicates(db_session: Session, user_id: uuid.UUID) -> None:

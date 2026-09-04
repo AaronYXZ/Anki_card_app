@@ -127,6 +127,23 @@ def set_card_favorite(
     return card
 
 
+def remove_card_from_learning(
+    session: Session,
+    *,
+    user_id: uuid.UUID,
+    card_id: uuid.UUID,
+) -> Card:
+    """Soft-delete a card while preserving versions and review history."""
+    card = get_owned_card(session, user_id=user_id, card_id=card_id)
+    changed_at = utc_now()
+    card.state = CardState.RETIRED
+    card.is_favorite = False
+    card.favorited_at = None
+    card.updated_at = changed_at
+    session.flush()
+    return card
+
+
 def create_draft(
     session: Session,
     *,
