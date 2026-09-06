@@ -12,6 +12,7 @@ from anki_card_app.config import get_settings
 from anki_card_app.models import (
     ChunkGenerationStatus,
     GenerationChunkRun,
+    GenerationProfile,
     GenerationRun,
     GenerationStatus,
     SourceDocument,
@@ -32,6 +33,7 @@ def test_import_pages_and_markdown_upload(client: TestClient, db_session: Sessio
     assert "Import notes" in form.text
     assert "gpt-5.6-terra" in form.text
     assert "gpt-5.6-luna" in form.text
+    assert 'name="behavioral"' in form.text
     assert uploaded.status_code == 303
     run = db_session.scalar(select(GenerationRun))
     assert run is not None
@@ -77,6 +79,32 @@ def test_same_note_can_run_with_a_different_model(client: TestClient, db_session
     assert first.headers["location"] != second.headers["location"]
     assert [run.model for run in runs] == ["gpt-5.6-terra", "gpt-5.6-luna"]
     assert len(db_session.scalars(select(SourceDocument)).all()) == 1
+
+
+def test_behavioral_selection_creates_separate_whole_note_run(
+    client: TestClient, db_session: Session
+) -> None:
+    note = b"# Story\n## Context\nOne.\n## Actions\nTwo.\n## Results\nThree."
+    generic = client.post(
+        "/imports/new",
+        files={"upload": ("story.md", note, "text/markdown")},
+        follow_redirects=False,
+    )
+    behavioral = client.post(
+        "/imports/new",
+        data={"behavioral": "behavioral"},
+        files={"upload": ("story.md", note, "text/markdown")},
+        follow_redirects=False,
+    )
+
+    runs = db_session.scalars(select(GenerationRun).order_by(GenerationRun.created_at)).all()
+    assert generic.headers["location"] != behavioral.headers["location"]
+    assert [run.generation_profile for run in runs] == [
+        GenerationProfile.GENERAL,
+        GenerationProfile.BEHAVIORAL,
+    ]
+    assert runs[0].total_chunks > 1
+    assert runs[1].total_chunks == 1
 
 
 def test_import_upload_validation_and_missing_detail(client: TestClient) -> None:

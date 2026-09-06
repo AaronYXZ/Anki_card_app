@@ -30,6 +30,14 @@ class CardType(StrEnum):
     NORMAL = "normal"
     CLOZE = "cloze"
     SKELETON_RECALL = "skeleton_recall"
+    BEHAVIORAL_MAIN = "behavioral_main"
+    BEHAVIORAL_CARL = "behavioral_carl"
+    BEHAVIORAL_QUESTION = "behavioral_q"
+
+
+class GenerationProfile(StrEnum):
+    GENERAL = "general"
+    BEHAVIORAL = "behavioral"
 
 
 class NoteType(StrEnum):
@@ -61,6 +69,12 @@ class ChunkGenerationStatus(StrEnum):
 
 card_type_enum = Enum(
     CardType,
+    native_enum=False,
+    values_callable=lambda members: [member.value for member in members],
+    length=16,
+)
+generation_profile_enum = Enum(
+    GenerationProfile,
     native_enum=False,
     values_callable=lambda members: [member.value for member in members],
     length=16,
@@ -174,6 +188,9 @@ class GenerationRun(Base):
         ForeignKey("source_documents.id", ondelete="CASCADE"), index=True
     )
     prompt_version: Mapped[str] = mapped_column(String(32))
+    generation_profile: Mapped[GenerationProfile] = mapped_column(
+        generation_profile_enum, default=GenerationProfile.GENERAL, index=True
+    )
     provider: Mapped[str] = mapped_column(String(32))
     model: Mapped[str] = mapped_column(String(128))
     input_hash: Mapped[str] = mapped_column(String(64))
@@ -210,7 +227,8 @@ class Card(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "content_fingerprint", name="uq_cards_user_fingerprint"),
         CheckConstraint(
-            "card_type IN ('normal', 'cloze', 'skeleton_recall')",
+            "card_type IN ('normal', 'cloze', 'skeleton_recall', "
+            "'behavioral_main', 'behavioral_carl', 'behavioral_q')",
             name="ck_cards_card_type",
         ),
         CheckConstraint(
@@ -240,6 +258,13 @@ class Card(Base):
     template_key: Mapped[str | None] = mapped_column(String(32))
     content_fingerprint: Mapped[str | None] = mapped_column(String(64))
     card_type: Mapped[CardType] = mapped_column(card_type_enum)
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    story_id: Mapped[str | None] = mapped_column(String(128), index=True)
+    story_name: Mapped[str | None] = mapped_column(Text)
+    card_role: Mapped[str | None] = mapped_column(String(64))
+    main_story_card_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("cards.id", ondelete="SET NULL"), index=True
+    )
     state: Mapped[CardState] = mapped_column(card_state_enum, default=CardState.DRAFT, index=True)
     is_favorite: Mapped[bool] = mapped_column(default=False)
     favorited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)

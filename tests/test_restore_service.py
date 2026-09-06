@@ -97,8 +97,12 @@ def _complete_export(session: Session, *, user: UserAccount) -> dict[str, Any]:
         source_excerpt=chunk.text,
     )
     active.is_favorite = True
+    active.tags = ["behavioral::story::attention-story"]
+    active.story_id = "attention-story"
+    active.story_name = "Attention story"
+    active.card_role = "Main Story"
     approve_card(session, user_id=user.id, card_id=active.id, due_at=utc_now())
-    create_draft(
+    draft = create_draft(
         session,
         user_id=user.id,
         card_type=CardType.CLOZE,
@@ -108,6 +112,11 @@ def _complete_export(session: Session, *, user: UserAccount) -> dict[str, Any]:
         source_chunk_id=chunk.id,
         generation_run_id=run.id,
     )
+    draft.tags = ["behavioral::story::attention-story"]
+    draft.story_id = "attention-story"
+    draft.story_name = "Attention story"
+    draft.card_role = "Question::Follow-up"
+    draft.main_story_card_id = active.id
     review_session = get_or_create_daily_session(session, user_id=user.id, now=utc_now())
     assert review_session is not None
     reveal_answer(
@@ -163,6 +172,12 @@ def test_restore_round_trip_preserves_learning_history_and_drafts(db_session: Se
     assert {card.state for card in restored_cards} == {CardState.ACTIVE, CardState.DRAFT}
     assert sum(card.is_favorite for card in restored_cards) == 1
     assert next(card for card in restored_cards if card.is_favorite).favorited_at is not None
+    restored_main = next(card for card in restored_cards if card.card_role == "Main Story")
+    restored_child = next(
+        card for card in restored_cards if card.card_role == "Question::Follow-up"
+    )
+    assert restored_child.main_story_card_id == restored_main.id
+    assert restored_child.tags == ["behavioral::story::attention-story"]
     assert not source_card_ids.intersection(card.id for card in restored_cards)
     assert {version.created_by for version in restored_versions} == {"ai"}
     assert restored_logs[0].rating == 3
@@ -184,6 +199,13 @@ def test_restore_old_backup_defaults_missing_favorites_to_false(db_session: Sess
     for card in payload["data"]["cards"]:
         del card["is_favorite"]
         del card["favorited_at"]
+        del card["tags"]
+        del card["story_id"]
+        del card["story_name"]
+        del card["card_role"]
+        del card["main_story_card_id"]
+    for run in payload["data"]["generation_runs"]:
+        del run["generation_profile"]
 
     restore_user_export(db_session, user_id=target_user.id, payload=payload)
     db_session.commit()
@@ -192,6 +214,7 @@ def test_restore_old_backup_defaults_missing_favorites_to_false(db_session: Sess
     assert restored_cards
     assert all(card.is_favorite is False for card in restored_cards)
     assert all(card.favorited_at is None for card in restored_cards)
+    assert all(card.tags == [] and card.story_id is None for card in restored_cards)
 
 
 def test_restore_accepts_format_one_backup_without_study_notes(db_session: Session) -> None:

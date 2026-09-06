@@ -9,8 +9,11 @@ from sqlalchemy.orm import Session
 
 from anki_card_app.card_service import CardContent, create_draft
 from anki_card_app.generation import (
+    BEHAVIORAL_CARD_GENERATION_PROMPT,
+    BEHAVIORAL_PROMPT_VERSION,
     CARD_GENERATION_PROMPT,
     PROMPT_VERSION,
+    BehavioralGeneratedCardBatch,
     GeneratedCard,
     GeneratedCardBatch,
     GenerationProviderError,
@@ -27,6 +30,7 @@ from anki_card_app.models import (
     CardVersion,
     ChunkGenerationStatus,
     GenerationChunkRun,
+    GenerationProfile,
     GenerationRun,
     GenerationStatus,
     SourceChunk,
@@ -134,6 +138,80 @@ $\\hat{\\tau}_{obs} \\approx (1-c)\\tau$
     assert cards[0].source_excerpt in source
 
 
+def behavioral_cards() -> list[GeneratedCard]:
+    shared = {"story_id": "launch-conflict", "story_name": "Launch conflict"}
+    return [
+        GeneratedCard(
+            card_type="behavioral_main",
+            front="Launch conflict\n\nRecall the complete story and the questions it can answer.",
+            back=(
+                "### Summary\nContext sentence. Action sentence. "
+                "Result sentence. Lesson sentence."
+            ),
+            source_excerpt="Context sentence.",
+            card_role="Main Story",
+            **shared,
+        ),
+        *[
+            GeneratedCard(
+                card_type="behavioral_carl",
+                front=f"Launch conflict\n\n{component}",
+                back=f"{component} sentence.",
+                source_excerpt=f"{component} sentence.",
+                card_role=f"CARL::{component}",
+                **shared,
+            )
+            for component in ("Context", "Actions", "Results", "Learnings")
+        ],
+        GeneratedCard(
+            card_type="behavioral_q",
+            front="Tell me about a conflict.",
+            back="Story: Launch conflict\n\nAnswer pivot:\nPivot sentence.",
+            source_excerpt="Pivot sentence.",
+            card_role="Question::Variation",
+            **shared,
+        ),
+    ]
+
+
+def test_behavioral_batch_requires_main_story_four_carl_and_shared_metadata() -> None:
+    assert BEHAVIORAL_PROMPT_VERSION == "behavioral-v1"
+    batch = BehavioralGeneratedCardBatch(cards=behavioral_cards())
+
+    assert len(batch.cards) == 6
+    with pytest.raises(ValueError, match="four CARL"):
+        BehavioralGeneratedCardBatch(cards=behavioral_cards()[:-2] + behavioral_cards()[-1:])
+    with pytest.raises(ValueError, match="Behavioral import mode"):
+        GeneratedCardBatch(cards=behavioral_cards()[:1])
+
+
+def test_behavioral_openai_adapter_uses_dedicated_prompt_and_complete_source() -> None:
+    batch = BehavioralGeneratedCardBatch(cards=behavioral_cards())
+
+    class Response:
+        output_parsed = batch
+        _request_id = "req_behavioral"
+
+    class Responses:
+        def parse(self, **kwargs: object) -> Response:
+            assert kwargs["text_format"] is BehavioralGeneratedCardBatch
+            assert BEHAVIORAL_CARD_GENERATION_PROMPT in str(kwargs["input"])
+            assert "COMPLETE STORY END" in str(kwargs["input"])
+            return Response()
+
+    generator = OpenAICardGenerator.__new__(OpenAICardGenerator)
+    generator.model = "test-model"
+    generator.profile = GenerationProfile.BEHAVIORAL
+    generator.source_text = "Context sentence. COMPLETE STORY END"
+    generator._client = type("Client", (), {"responses": Responses()})()
+    chunk = SourceChunk(source_document_id=uuid.uuid4(), sequence=0, text="Context sentence.")
+
+    result = generator.generate(chunk)
+
+    assert result.cards == batch.cards
+    assert result.request_id == "req_behavioral"
+
+
 def test_explicit_markdown_qa_headings_and_inline_labels_are_detected() -> None:
     source = """### Question
 What is lift?
@@ -232,6 +310,60 @@ def test_process_generation_creates_provenanced_drafts(db_session: Session) -> N
     assert versions[0].source_excerpt is not None
     assert versions[0].source_excerpt.startswith("Power")
     assert versions[0].ai_enrichment == "It equals one minus beta."
+
+
+def test_behavioral_run_saves_story_metadata_tags_and_main_link(db_session: Session) -> None:
+    user_identifier = uuid.uuid4()
+    user = ensure_user(
+        db_session,
+        user_id=user_identifier,
+        email=f"{user_identifier}@example.com",
+    )
+    source_text = (
+        "# Launch conflict\nContext sentence.\n## Actions\nActions sentence.\n"
+        "## Results\nResults sentence.\n## Learnings\nLearnings sentence.\nPivot sentence."
+    )
+    imported = import_markdown(
+        db_session,
+        user_id=user.id,
+        source=MarkdownSource("story.md", source_text),
+    )
+    run = create_generation_run(
+        db_session,
+        user_id=user.id,
+        source_document_id=imported.document.id,
+        provider="fake",
+        model="test-model",
+        input_hash=imported.document.content_hash,
+        profile=GenerationProfile.BEHAVIORAL,
+    )
+    db_session.commit()
+
+    class BehavioralFakeGenerator:
+        provider = "fake"
+        model = "test-model"
+
+        def generate(self, chunk: SourceChunk) -> GenerationResult:
+            return GenerationResult(cards=behavioral_cards())
+
+    completed = process_generation_run(
+        db_session,
+        run_id=run.id,
+        generator=BehavioralFakeGenerator(),
+    )
+    cards = db_session.scalars(select(Card).order_by(Card.created_at)).all()
+    main = next(card for card in cards if card.card_type is CardType.BEHAVIORAL_MAIN)
+
+    assert completed.prompt_version == BEHAVIORAL_PROMPT_VERSION
+    assert completed.total_chunks == 1
+    assert completed.generated_cards == 6
+    assert all(card.story_id == "launch-conflict" for card in cards)
+    assert all(card.tags == ["behavioral::story::launch-conflict"] for card in cards)
+    assert all(
+        card.main_story_card_id == main.id
+        for card in cards
+        if card.card_type is not CardType.BEHAVIORAL_MAIN
+    )
 
 
 def test_generation_progress_is_committed_before_provider_call(

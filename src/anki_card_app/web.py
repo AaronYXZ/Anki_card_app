@@ -82,7 +82,7 @@ def current_user_id(request: Request, session: Session) -> uuid.UUID:
 
 
 def make_card_view(card: Card, version: CardVersion) -> CardView:
-    if card.card_type in {CardType.NORMAL, CardType.SKELETON_RECALL}:
+    if card.card_type is not CardType.CLOZE:
         return CardView(
             card=card,
             version=version,

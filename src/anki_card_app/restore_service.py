@@ -103,6 +103,7 @@ _TABLE_SPECS = (
             "generation_run_id": "generation_runs",
             "note_id": "study_notes",
             "current_version_id": "card_versions",
+            "main_story_card_id": "cards",
         },
         True,
     ),
@@ -124,11 +125,17 @@ _TABLE_SPECS = (
 _TABLES_BY_NAME = {spec.name: spec for spec in _TABLE_SPECS}
 _OWNED_ROOT_MODELS = (SourceDocument, GenerationRun, StudyNote, Card, ReviewSession, ReviewLog)
 _OPTIONAL_COLUMN_DEFAULTS: dict[str, dict[str, Any]] = {
+    "generation_runs": {"generation_profile": "general"},
     "cards": {
         "is_favorite": False,
         "favorited_at": None,
         "note_id": None,
         "template_key": None,
+        "tags": [],
+        "story_id": None,
+        "story_name": None,
+        "card_role": None,
+        "main_story_card_id": None,
     },
 }
 
@@ -387,18 +394,29 @@ def restore_user_export(
     with session.begin_nested():
         user.timezone, user.daily_limit, user.desired_retention = user_settings
         card_current_versions: dict[uuid.UUID, uuid.UUID | None] = {}
+        card_main_stories: dict[uuid.UUID, uuid.UUID | None] = {}
         restored_objects: dict[str, list[Base]] = {}
         for spec in _TABLE_SPECS:
             objects: list[Base] = []
             for values in remapped[spec.name]:
                 if spec.name == "cards":
                     card_current_versions[values["id"]] = values["current_version_id"]
-                    values = {**values, "current_version_id": None}
+                    card_main_stories[values["id"]] = values["main_story_card_id"]
+                    values = {
+                        **values,
+                        "current_version_id": None,
+                        "main_story_card_id": None,
+                    }
                 model = cast(Any, spec.model)
                 objects.append(model(**values))
             session.add_all(objects)
             session.flush()
             restored_objects[spec.name] = objects
+            if spec.name == "cards":
+                for card in restored_objects["cards"]:
+                    typed_card = cast(Card, card)
+                    typed_card.main_story_card_id = card_main_stories[typed_card.id]
+                session.flush()
             if spec.name == "card_versions":
                 for card in restored_objects["cards"]:
                     typed_card = cast(Card, card)

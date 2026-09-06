@@ -37,6 +37,7 @@ from anki_card_app.models import (
     Card,
     ChunkGenerationStatus,
     GenerationChunkRun,
+    GenerationProfile,
     GenerationRun,
     GenerationStatus,
     SourceChunk,
@@ -55,11 +56,17 @@ GENERATION_MODEL_OPTIONS = (
 ALLOWED_GENERATION_MODELS = frozenset(model for model, _ in GENERATION_MODEL_OPTIONS)
 
 
-def _import_form_context(*, selected_model: str, error: str | None = None) -> dict[str, object]:
+def _import_form_context(
+    *,
+    selected_model: str,
+    behavioral_selected: bool = False,
+    error: str | None = None,
+) -> dict[str, object]:
     return {
         "error": error,
         "model_options": GENERATION_MODEL_OPTIONS,
         "selected_model": selected_model,
+        "behavioral_selected": behavioral_selected,
     }
 
 
@@ -72,12 +79,23 @@ def _process_in_background(
 ) -> None:
     with Session(get_engine()) as session:
         try:
+            run = session.get(GenerationRun, run_id)
+            if run is None:
+                return
+            document = session.get(SourceDocument, run.source_document_id)
             process_generation_run(
                 session,
                 run_id=run_id,
                 generator=OpenAICardGenerator(
                     api_key=api_key,
                     model=model,
+                    profile=run.generation_profile,
+                    source_text=(
+                        document.raw_content
+                        if document is not None
+                        and run.generation_profile is GenerationProfile.BEHAVIORAL
+                        else None
+                    ),
                     timeout_seconds=timeout_seconds,
                     max_retries=max_retries,
                 ),
@@ -132,16 +150,23 @@ async def import_action(
     session: SessionDependency,
     upload: Annotated[UploadFile, File()],
     model: Annotated[str, Form()] = "",
+    behavioral: Annotated[str | None, Form()] = None,
 ) -> Response:
     user_id = current_user_id(request, session)
     settings = get_settings()
     selected_model = model.strip() or settings.openai_model
+    generation_profile = (
+        GenerationProfile.BEHAVIORAL
+        if behavioral == GenerationProfile.BEHAVIORAL.value
+        else GenerationProfile.GENERAL
+    )
     if selected_model not in ALLOWED_GENERATION_MODELS:
         return templates.TemplateResponse(
             request=request,
             name="import_form.html",
             context=_import_form_context(
                 selected_model=GENERATION_MODEL_OPTIONS[0][0],
+                behavioral_selected=generation_profile is GenerationProfile.BEHAVIORAL,
                 error="Choose Terra or Luna for card generation.",
             ),
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -164,6 +189,7 @@ async def import_action(
                     GenerationRun.user_id == user_id,
                     GenerationRun.source_document_id == imported.document.id,
                     GenerationRun.model == selected_model,
+                    GenerationRun.generation_profile == generation_profile,
                 )
                 .order_by(GenerationRun.created_at.desc())
             )
@@ -178,6 +204,7 @@ async def import_action(
                 provider="openai",
                 model=selected_model,
                 input_hash=imported.document.content_hash,
+                profile=generation_profile,
             )
             if settings.openai_api_key is None:
                 run.status = GenerationStatus.FAILED
@@ -206,6 +233,7 @@ async def import_action(
             name="import_form.html",
             context=_import_form_context(
                 selected_model=selected_model,
+                behavioral_selected=generation_profile is GenerationProfile.BEHAVIORAL,
                 error=str(error),
             ),
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -276,6 +304,7 @@ def retry_import_generation(
         provider="openai",
         model=original.model,
         input_hash=document.content_hash,
+        profile=original.generation_profile,
     )
     session.commit()
     background_tasks.add_task(

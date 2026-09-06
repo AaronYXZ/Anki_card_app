@@ -20,7 +20,7 @@
     {% if runs %}
       <div class="card-list">
         {% for run in runs %}
-          <a class="import-row" href="/imports/{{ run.id }}"><span><b>{{ run.created_at.strftime("%Y-%m-%d %H:%M") }}</b><small>{{ run.generated_cards }} generated · {{ run.completed_chunks }}/{{ run.total_chunks }} chunks · {{ run.model }}</small></span><span class="pill status-{{ run.status.value }}">{{ run.status.value }}</span></a>
+          <a class="import-row" href="/imports/{{ run.id }}"><span><b>{{ run.created_at.strftime("%Y-%m-%d %H:%M") }}</b><small>{{ run.generation_profile.value|title }} · {{ run.generated_cards }} generated · {{ run.completed_chunks }}/{{ run.total_chunks }} chunks · {{ run.model }}</small></span><span class="pill status-{{ run.status.value }}">{{ run.status.value }}</span></a>
         {% endfor %}
       </div>
     {% else %}<p class="muted">No generation runs.</p>{% endif %}

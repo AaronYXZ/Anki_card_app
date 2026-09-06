@@ -79,6 +79,15 @@ def validate_content(card_type: CardType, content: CardContent) -> CardContent:
             raise CardValidationError("Normal cards require both a question and an answer.")
         return normalized
 
+    if card_type in {
+        CardType.BEHAVIORAL_MAIN,
+        CardType.BEHAVIORAL_CARL,
+        CardType.BEHAVIORAL_QUESTION,
+    }:
+        if normalized.front is None or normalized.back is None:
+            raise CardValidationError("This card type requires both a front and a back.")
+        return normalized
+
     if card_type is CardType.SKELETON_RECALL:
         if normalized.front is None or normalized.back is None:
             raise CardValidationError(
@@ -158,6 +167,11 @@ def create_draft(
     ai_enrichment: str | None = None,
     note_id: uuid.UUID | None = None,
     template_key: str | None = None,
+    tags: list[str] | None = None,
+    story_id: str | None = None,
+    story_name: str | None = None,
+    card_role: str | None = None,
+    main_story_card_id: uuid.UUID | None = None,
 ) -> Card:
     if (note_id is None) != (template_key is None):
         raise CardValidationError("A sibling card requires both a note and a template key.")
@@ -179,6 +193,11 @@ def create_draft(
         generation_run_id=generation_run_id,
         note_id=note_id,
         template_key=template_key,
+        tags=tags or [],
+        story_id=clean_optional(story_id),
+        story_name=clean_optional(story_name),
+        card_role=clean_optional(card_role),
+        main_story_card_id=main_story_card_id,
         content_fingerprint=fingerprint,
     )
     session.add(card)
