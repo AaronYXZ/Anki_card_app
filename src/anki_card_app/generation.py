@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Literal, Protocol
 
@@ -33,7 +34,13 @@ from anki_card_app.models import (
     utc_now,
 )
 
-PROMPT_VERSION = "anki-v7-authored-answers"
+PROMPT_VERSION = "anki-v8-authored-answer-parser"
+AUTHORED_LABEL_RE = re.compile(
+    r"^(?:#{1,6}[ \t]+)?"
+    r"(?P<label>question|q|prompt|answer|a|response|solution)"
+    r"[ \t]*(?::[ \t]*(?P<inline>[^\r\n]*))?[ \t]*\r?$",
+    re.IGNORECASE | re.MULTILINE,
+)
 CARD_GENERATION_PROMPT = """
 You create durable interview-preparation flashcards for machine learning engineers.
 Extract the source's key concepts, facts, decisions, equations, code behavior, and
@@ -157,6 +164,61 @@ class GenerationResult(BaseModel):
     request_id: str | None = None
 
 
+def _labeled_content(match: re.Match[str], text: str, end: int) -> str:
+    inline = (match.group("inline") or "").strip()
+    following = text[match.end() : end].strip()
+    return "\n".join(part for part in (inline, following) if part)
+
+
+def extract_authored_qa_cards(text: str) -> list[GeneratedCard]:
+    labels = list(AUTHORED_LABEL_RE.finditer(text))
+    question_labels = {"question", "q", "prompt"}
+    answer_labels = {"answer", "a", "response", "solution"}
+    cards: list[GeneratedCard] = []
+    for index, question_match in enumerate(labels):
+        if question_match.group("label").casefold() not in question_labels:
+            continue
+        answer_index = next(
+            (
+                candidate_index
+                for candidate_index in range(index + 1, len(labels))
+                if labels[candidate_index].group("label").casefold()
+                in question_labels | answer_labels
+            ),
+            None,
+        )
+        if answer_index is None:
+            continue
+        answer_match = labels[answer_index]
+        if answer_match.group("label").casefold() not in answer_labels:
+            continue
+        next_question = next(
+            (
+                candidate
+                for candidate in labels[answer_index + 1 :]
+                if candidate.group("label").casefold() in question_labels
+            ),
+            None,
+        )
+        answer_end = next_question.start() if next_question is not None else len(text)
+        question = _labeled_content(question_match, text, answer_match.start())
+        answer = _labeled_content(answer_match, text, answer_end)
+        if not question or not answer:
+            continue
+        excerpt = text[question_match.start() : answer_end].strip()[:1_500]
+        cards.append(
+            GeneratedCard(
+                card_type="normal",
+                front=question,
+                back=answer,
+                source_excerpt=excerpt,
+            )
+        )
+        if len(cards) == 20:
+            break
+    return cards
+
+
 class CardGenerator(Protocol):
     provider: str
     model: str
@@ -183,6 +245,9 @@ class OpenAICardGenerator:
         )
 
     def generate(self, chunk: SourceChunk) -> GenerationResult:
+        authored_cards = extract_authored_qa_cards(chunk.text)
+        if authored_cards:
+            return GenerationResult(cards=authored_cards)
         heading = chunk.heading_path or "Untitled section"
         try:
             response = self._client.responses.parse(
