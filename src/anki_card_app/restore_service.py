@@ -129,6 +129,7 @@ _OPTIONAL_COLUMN_DEFAULTS: dict[str, dict[str, Any]] = {
     "cards": {
         "is_favorite": False,
         "favorited_at": None,
+        "approved_at": None,
         "note_id": None,
         "template_key": None,
         "tags": [],
@@ -137,6 +138,7 @@ _OPTIONAL_COLUMN_DEFAULTS: dict[str, dict[str, Any]] = {
         "card_role": None,
         "main_story_card_id": None,
     },
+    "review_session_cards": {"is_bonus": False},
 }
 
 

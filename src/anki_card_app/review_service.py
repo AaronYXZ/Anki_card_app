@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, time, tzinfo
+from datetime import UTC, datetime, time, timedelta, tzinfo
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from anki_card_app.fsrs_adapter import apply_review, as_utc
@@ -53,6 +53,7 @@ class ReviewSubmission:
 
 DAILY_NORMAL_MINIMUM = 10
 DAILY_SKELETON_RECALL_MINIMUM = 3
+NEWLY_APPROVED_BONUS_DAYS = 2
 
 
 def _owned_session(session: Session, *, user_id: uuid.UUID, session_id: uuid.UUID) -> ReviewSession:
@@ -175,6 +176,37 @@ def _select_due_card_ids(
     return [*reviewed_ids, *new_ids]
 
 
+def _select_newly_approved_bonus_ids(
+    session: Session,
+    *,
+    user_id: uuid.UUID,
+    current_time: datetime,
+) -> list[uuid.UUID]:
+    approval_cutoff = current_time - timedelta(days=NEWLY_APPROVED_BONUS_DAYS)
+    rows = session.execute(
+        select(Card.id, Card.note_id)
+        .join(SchedulingState, SchedulingState.card_id == Card.id)
+        .where(
+            Card.user_id == user_id,
+            Card.state == CardState.ACTIVE,
+            Card.approved_at.is_not(None),
+            Card.approved_at >= approval_cutoff,
+            Card.approved_at <= current_time,
+            SchedulingState.due_at <= current_time,
+        )
+        .order_by(SchedulingState.due_at, Card.approved_at, Card.id)
+    ).all()
+    selected: list[uuid.UUID] = []
+    seen_note_ids: set[uuid.UUID] = set()
+    for card_id, note_id in rows:
+        if note_id is not None and note_id in seen_note_ids:
+            continue
+        selected.append(card_id)
+        if note_id is not None:
+            seen_note_ids.add(note_id)
+    return selected
+
+
 def get_or_create_daily_session(
     session: Session,
     *,
@@ -209,25 +241,40 @@ def get_or_create_daily_session(
     for stale_session in stale_sessions:
         stale_session.completed_at = current_time
 
+    bonus_ids = _select_newly_approved_bonus_ids(
+        session,
+        user_id=user_id,
+        current_time=current_time,
+    )
+    bonus_set = set(bonus_ids)
     reviewed_today_by_type: dict[CardType, int] = {
         card_type: count
         for card_type, count in session.execute(
             select(Card.card_type, func.count())
             .join(ReviewLog, ReviewLog.card_id == Card.id)
+            .outerjoin(
+                ReviewSessionCard,
+                and_(
+                    ReviewSessionCard.review_session_id == ReviewLog.review_session_id,
+                    ReviewSessionCard.card_id == ReviewLog.card_id,
+                ),
+            )
             .where(
                 ReviewLog.user_id == user_id,
                 ReviewLog.reviewed_at >= day_start,
+                or_(
+                    ReviewSessionCard.id.is_(None),
+                    ReviewSessionCard.is_bonus.is_(False),
+                ),
             )
             .group_by(Card.card_type)
         ).tuples()
     }
     reviewed_today = sum(reviewed_today_by_type.values())
     remaining = max(0, user.daily_limit - reviewed_today)
-    if remaining == 0:
-        return None
 
     selected_ids: list[uuid.UUID] = []
-    selected_set: set[uuid.UUID] = set()
+    selected_set: set[uuid.UUID] = set(bonus_set)
     for card_type, target in _daily_type_targets(user.daily_limit).items():
         missing = max(0, target - reviewed_today_by_type.get(card_type, 0))
         quota_ids = _select_due_card_ids(
@@ -241,19 +288,23 @@ def get_or_create_daily_session(
         selected_ids.extend(quota_ids)
         selected_set.update(quota_ids)
 
-    fill_ids = _select_due_card_ids(
-        session,
-        user_id=user_id,
-        current_time=current_time,
-        limit=remaining - len(selected_ids),
-        excluded_ids=selected_set,
+    fill_ids = (
+        _select_due_card_ids(
+            session,
+            user_id=user_id,
+            current_time=current_time,
+            limit=remaining - len(selected_ids),
+            excluded_ids=selected_set,
+        )
+        if remaining > len(selected_ids)
+        else []
     )
     selected_set.update(fill_ids)
-    card_ids = list(
+    regular_ids = list(
         session.scalars(
             select(Card.id)
             .join(SchedulingState, SchedulingState.card_id == Card.id)
-            .where(Card.id.in_(selected_set))
+            .where(Card.id.in_([*selected_ids, *fill_ids]))
             .order_by(
                 SchedulingState.review_count == 0,
                 SchedulingState.due_at,
@@ -262,6 +313,7 @@ def get_or_create_daily_session(
             )
         )
     )
+    card_ids = [*bonus_ids, *regular_ids]
     if not card_ids:
         return None
 
@@ -278,6 +330,7 @@ def get_or_create_daily_session(
             review_session_id=review_session.id,
             card_id=card_id,
             position=position,
+            is_bonus=card_id in bonus_set,
         )
         for position, card_id in enumerate(card_ids)
     )

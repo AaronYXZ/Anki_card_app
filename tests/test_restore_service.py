@@ -199,6 +199,7 @@ def test_restore_old_backup_defaults_missing_favorites_to_false(db_session: Sess
     for card in payload["data"]["cards"]:
         del card["is_favorite"]
         del card["favorited_at"]
+        del card["approved_at"]
         del card["tags"]
         del card["story_id"]
         del card["story_name"]
@@ -206,6 +207,8 @@ def test_restore_old_backup_defaults_missing_favorites_to_false(db_session: Sess
         del card["main_story_card_id"]
     for run in payload["data"]["generation_runs"]:
         del run["generation_profile"]
+    for item in payload["data"]["review_session_cards"]:
+        del item["is_bonus"]
 
     restore_user_export(db_session, user_id=target_user.id, payload=payload)
     db_session.commit()

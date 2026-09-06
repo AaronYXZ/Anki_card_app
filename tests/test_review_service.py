@@ -118,6 +118,118 @@ def test_queue_orders_due_reviews_before_new_and_resumes(db_session: Session) ->
     assert get_or_create_daily_session(db_session, user_id=user.id, now=NOW) is review_session
 
 
+def test_newly_approved_cards_are_bonus_reviews_beyond_daily_limit(
+    db_session: Session,
+) -> None:
+    user = make_user(db_session, daily_limit=2)
+    regular_cards = [
+        make_active_card(db_session, user, question=f"Regular {number}") for number in range(2)
+    ]
+    for card in regular_cards:
+        card.approved_at = NOW - timedelta(days=3)
+        state = db_session.get(SchedulingState, card.id)
+        assert state is not None
+        state.review_count = 1
+    bonus_cards = [
+        make_active_card(db_session, user, question=f"Bonus {number}") for number in range(3)
+    ]
+    for card in bonus_cards:
+        card.approved_at = NOW - timedelta(hours=12)
+
+    review_session = get_or_create_daily_session(db_session, user_id=user.id, now=NOW)
+
+    assert review_session is not None
+    items = db_session.scalars(
+        select(ReviewSessionCard)
+        .where(ReviewSessionCard.review_session_id == review_session.id)
+        .order_by(ReviewSessionCard.position)
+    ).all()
+    assert review_session.queue_size == 5
+    assert {item.card_id for item in items[:3]} == {card.id for card in bonus_cards}
+    assert [item.is_bonus for item in items] == [True, True, True, False, False]
+
+
+def test_completed_bonus_review_does_not_reduce_regular_daily_quota(
+    db_session: Session,
+) -> None:
+    user = make_user(db_session, daily_limit=2)
+    bonus_card = make_active_card(
+        db_session,
+        user,
+        question="Already reviewed bonus",
+        due_at=NOW + timedelta(days=1),
+    )
+    bonus_card.approved_at = NOW - timedelta(hours=6)
+    completed_session = ReviewSession(
+        user_id=user.id,
+        queue_size=1,
+        reviewed_count=1,
+        started_at=NOW - timedelta(hours=1),
+        completed_at=NOW,
+    )
+    db_session.add(completed_session)
+    db_session.flush()
+    db_session.add(
+        ReviewSessionCard(
+            review_session_id=completed_session.id,
+            card_id=bonus_card.id,
+            position=0,
+            is_bonus=True,
+            completed_at=NOW,
+        )
+    )
+    db_session.add(
+        ReviewLog(
+            attempt_id=uuid.uuid4(),
+            user_id=user.id,
+            card_id=bonus_card.id,
+            review_session_id=completed_session.id,
+            rating=3,
+            reviewed_at=NOW,
+            was_new=True,
+            prior_state={},
+            new_state={},
+        )
+    )
+    regular_cards = [
+        make_active_card(db_session, user, question=f"Regular due {number}")
+        for number in range(2)
+    ]
+    for card in regular_cards:
+        card.approved_at = NOW - timedelta(days=3)
+
+    review_session = get_or_create_daily_session(
+        db_session,
+        user_id=user.id,
+        now=NOW + timedelta(minutes=1),
+    )
+
+    assert review_session is not None
+    assert review_session.queue_size == 2
+
+
+def test_new_card_bonus_expires_after_two_days(db_session: Session) -> None:
+    user = make_user(db_session, daily_limit=1)
+    cards = [
+        make_active_card(db_session, user, question=f"Older card {number}")
+        for number in range(2)
+    ]
+    for card in cards:
+        card.approved_at = NOW - timedelta(days=2, seconds=1)
+
+    review_session = get_or_create_daily_session(db_session, user_id=user.id, now=NOW)
+
+    assert review_session is not None
+    item = db_session.scalar(
+        select(ReviewSessionCard).where(
+            ReviewSessionCard.review_session_id == review_session.id
+        )
+    )
+    assert review_session.queue_size == 1
+    assert item is not None
+    assert item.is_bonus is False
+
+
 def test_queue_reserves_normal_and_skeleton_daily_minimums(db_session: Session) -> None:
     user = make_user(db_session, daily_limit=15)
     for number in range(10):

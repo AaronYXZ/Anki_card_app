@@ -13,7 +13,8 @@
   <section class="dashboard-section">
     <h2>Today</h2>
     <div class="metrics dashboard-metrics" aria-label="Daily review metrics">
-      <article><strong>{{ metrics.reviewed_today }}/{{ metrics.daily_limit }}</strong><span>Reviews completed</span></article>
+      <article><strong>{{ metrics.quota_reviewed_today }}/{{ metrics.daily_limit }}</strong><span>Regular reviews completed</span></article>
+      <article><strong>+{{ metrics.bonus_reviewed_today }}</strong><span>New-card bonus reviews</span></article>
       <article><strong>{{ metrics.due_review_count }}</strong><span>Due reviews</span></article>
       <article><strong>{{ metrics.overdue_count }}</strong><span>Overdue</span></article>
       <article><strong>{{ metrics.new_ready_count }}</strong><span>New cards ready</span></article>

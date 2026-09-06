@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta, tzinfo
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from anki_card_app.fsrs_adapter import as_utc
@@ -14,6 +14,7 @@ from anki_card_app.models import (
     CardState,
     ReviewLog,
     ReviewSession,
+    ReviewSessionCard,
     SchedulingState,
     UserAccount,
     utc_now,
@@ -27,6 +28,8 @@ class DashboardMetrics:
     overdue_count: int
     new_ready_count: int
     reviewed_today: int
+    quota_reviewed_today: int
+    bonus_reviewed_today: int
     completed_sessions_today: int
     review_minutes_today: float
     daily_limit: int
@@ -130,6 +133,25 @@ def dashboard_metrics(
         )
         or 0
     )
+    bonus_reviewed_today = (
+        session.scalar(
+            select(func.count())
+            .select_from(ReviewLog)
+            .join(
+                ReviewSessionCard,
+                and_(
+                    ReviewSessionCard.review_session_id == ReviewLog.review_session_id,
+                    ReviewSessionCard.card_id == ReviewLog.card_id,
+                ),
+            )
+            .where(
+                ReviewLog.user_id == user_id,
+                ReviewLog.reviewed_at >= today_start,
+                ReviewSessionCard.is_bonus.is_(True),
+            )
+        )
+        or 0
+    )
     completed_sessions_today = (
         session.scalar(
             select(func.count())
@@ -174,6 +196,8 @@ def dashboard_metrics(
         overdue_count=overdue_count,
         new_ready_count=new_ready_count,
         reviewed_today=reviewed_today,
+        quota_reviewed_today=reviewed_today - bonus_reviewed_today,
+        bonus_reviewed_today=bonus_reviewed_today,
         completed_sessions_today=completed_sessions_today,
         review_minutes_today=response_time_ms / 60_000,
         daily_limit=user.daily_limit,

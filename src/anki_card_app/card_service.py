@@ -289,14 +289,16 @@ def approve_card(
         ),
     )
     card.state = CardState.ACTIVE
-    card.updated_at = utc_now()
+    approved_at = utc_now()
+    card.approved_at = approved_at
+    card.updated_at = approved_at
     user = session.get(UserAccount, user_id)
     if user is None:
         raise CardValidationError("Card owner is missing.")
     session.add(
         create_initial_schedule(
             card_id=card.id,
-            due_at=due_at or utc_now(),
+            due_at=due_at or approved_at,
             desired_retention=user.desired_retention,
         )
     )

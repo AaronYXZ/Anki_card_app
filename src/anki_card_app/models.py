@@ -268,6 +268,7 @@ class Card(Base):
     state: Mapped[CardState] = mapped_column(card_state_enum, default=CardState.DRAFT, index=True)
     is_favorite: Mapped[bool] = mapped_column(default=False)
     favorited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     current_version_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey(
             "card_versions.id",
@@ -392,6 +393,7 @@ class ReviewSessionCard(Base):
         ForeignKey("cards.id", ondelete="CASCADE"), index=True
     )
     position: Mapped[int] = mapped_column(Integer)
+    is_bonus: Mapped[bool] = mapped_column(default=False)
     revealed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
