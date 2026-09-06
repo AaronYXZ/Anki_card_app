@@ -33,7 +33,7 @@ from anki_card_app.models import (
     utc_now,
 )
 
-PROMPT_VERSION = "anki-v5-math-rendering"
+PROMPT_VERSION = "anki-v7-authored-answers"
 CARD_GENERATION_PROMPT = """
 You create durable interview-preparation flashcards for machine learning engineers.
 Extract the source's key concepts, facts, decisions, equations, code behavior, and
@@ -51,6 +51,21 @@ Choose the card type deliberately:
   experimentation processes. Do not use skeleton_recall for vocabulary, definitions,
   simple facts, formulas, or short lists.
 
+First detect whether the source contains an explicitly authored question-and-answer block.
+Recognize case-insensitive standalone labels or Markdown headings such as `Question:`, `Q:`,
+`Prompt:`, `Answer:`, `A:`, `Response:`, and `Solution:`. Treat them as structural labels only
+when they occur on their own line or as a heading, not when the words appear inside prose.
+When an explicit pair exists:
+- Create a normal card by default. Use the content after the question label and before the
+  answer label as the front. If there is only an answer label, use the enclosing heading or
+  clearly stated question as the front.
+- Use the complete coherent content after the answer label, stopping at the next question or
+  topic boundary, as the back. Remove only the structural label and unnecessary surrounding
+  whitespace. Preserve the author's wording, Markdown, order, examples, formulas, lists, and
+  explanations. Do not summarize, paraphrase, shorten, or move parts only to ai_enrichment.
+- Do not generate duplicate cards from individual details inside that same answer block.
+These authored answer rules take priority over the general synthesis rules below.
+
 For skeleton_recall, put a descriptive title and only major section headers or a numbered
 outline in front. Do not reveal supporting details in front. Put the same sections in back
 and fill each with compact bullets that preserve logical or chronological order, causal
@@ -58,14 +73,33 @@ reasoning, evidence, and examples. Include only enough detail to trigger reconst
 Never write a long essay. One skeleton_recall card covers one complete framework or story.
 
 Treat examples, cases, scenarios, analogies, anecdotes, sample calculations, and
-illustrative code as supporting context, not as default card material. Do not turn names,
-numbers, outcomes, steps, claims, or conclusions that are true only inside one example or
-case into standalone cards. Never generalize a rule from a single example. When the source
-explicitly states a reusable principle, decision criterion, or method, test that general
-idea and keep the example only as optional answer context or ai_enrichment. A complete case
-or story may become one skeleton_recall card only when the source clearly presents that
-case or story itself as something the learner should rehearse, such as their own project
-walkthrough or behavioral interview story. Never atomize its incidental details into cards.
+illustrative code as supporting context rather than separate facts to memorize. Do not turn
+names, numbers, outcomes, steps, claims, or conclusions that are true only inside one
+example or case into standalone cards. Never generalize a rule from a single example.
+
+For a normal card that asks about a concept, term, or metric, make the back independently
+useful for understanding, not just a one-line definition:
+- Start with a direct, concise answer to the question.
+- When the source contains an example, scenario, analogy, or concrete interpretation that
+  materially clarifies the concept, include the most useful one or a compact representative
+  set in the back under an **Example:** or **Interpretation:** label. Keep it faithful to the
+  source. Preserve multiple examples when each shows a distinct mechanism and the set stays
+  compact. Do not move essential explanatory examples only to ai_enrichment.
+- For a metric, statistical quantity, or mathematical relationship, include the relevant
+  source-supported formula when it helps understanding. Define its symbols and briefly state
+  how to interpret changes in the metric. Preserve the source's math notation and delimiters.
+- Do not invent an example, formula, threshold, or interpretation that the source does not
+  support. If the source has no useful example or formula, a concise explanation is enough.
+
+For example, if the source defines contamination and then gives control/treatment exposure
+scenarios, a card asking "What is contamination?" should answer with the definition and
+retain one or more compact exposure scenarios on the same card. The scenarios support the
+concept; they should not become independent cards.
+
+A complete case or story may become one skeleton_recall card only when the source clearly
+presents that case or story itself as something the learner should rehearse, such as their
+own project walkthrough or behavioral interview story. Never atomize its incidental details
+into cards.
 
 Card content supports Markdown. Preserve useful Markdown from the source when carrying
 material into front, back, cloze_text, back_extra, or ai_enrichment. In particular, keep

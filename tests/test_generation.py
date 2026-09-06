@@ -75,11 +75,28 @@ class FakeGenerator:
         return GenerationResult(cards=cards, request_id=f"request-{chunk.sequence}")
 
 
-def test_generation_prompt_rejects_example_specific_card_material() -> None:
-    assert PROMPT_VERSION == "anki-v5-math-rendering"
-    assert "supporting context, not as default card material" in CARD_GENERATION_PROMPT
+def test_generation_prompt_keeps_helpful_context_without_atomizing_examples() -> None:
+    assert PROMPT_VERSION == "anki-v7-authored-answers"
+    assert "explicitly authored question-and-answer block" in CARD_GENERATION_PROMPT
+    assert "Answer:`" in CARD_GENERATION_PROMPT
+    assert "Use the complete coherent content after the answer label" in CARD_GENERATION_PROMPT
+    assert "Preserve the author's wording, Markdown, order, examples, formulas" in (
+        CARD_GENERATION_PROMPT
+    )
+    assert "Do not summarize, paraphrase, shorten" in CARD_GENERATION_PROMPT
+    assert "take priority over the general synthesis rules" in CARD_GENERATION_PROMPT
+    assert "supporting context rather than separate facts to memorize" in CARD_GENERATION_PROMPT
     assert "Never generalize a rule from a single example" in CARD_GENERATION_PROMPT
-    assert "Never atomize its incidental details into cards" in CARD_GENERATION_PROMPT
+    assert "Never atomize its incidental details" in CARD_GENERATION_PROMPT
+    assert "not just a one-line definition" in CARD_GENERATION_PROMPT
+    assert "include the most useful one or a compact representative" in CARD_GENERATION_PROMPT
+    assert "each shows a distinct mechanism" in CARD_GENERATION_PROMPT
+    assert "Do not move essential explanatory examples only to ai_enrichment" in (
+        CARD_GENERATION_PROMPT
+    )
+    assert "source-supported formula when it helps understanding" in CARD_GENERATION_PROMPT
+    assert 'asking "What is contamination?"' in CARD_GENERATION_PROMPT
+    assert "retain one or more compact exposure scenarios" in CARD_GENERATION_PROMPT
     assert "Preserve useful Markdown from the source" in CARD_GENERATION_PROMPT
     assert "including its original Markdown" in CARD_GENERATION_PROMPT
     assert "Wrap generated inline LaTeX" in CARD_GENERATION_PROMPT
