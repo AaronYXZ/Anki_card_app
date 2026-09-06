@@ -16,6 +16,10 @@ from anki_card_app.models import SourceChunk, SourceDocument
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 FENCE_RE = re.compile(r"^\s*(```|~~~)")
+ANSWER_HEADING_RE = re.compile(
+    r"^(?:answer|a|response|solution|suggested answer|model answer)\s*:?[\s#]*$",
+    re.IGNORECASE,
+)
 
 
 class ImportValidationError(ValueError):
@@ -165,9 +169,12 @@ def chunk_markdown(content: str, *, max_chars: int = 6_000) -> list[MarkdownChun
             continue
         heading_match = HEADING_RE.match(line) if fence is None else None
         if heading_match:
-            flush()
             level = len(heading_match.group(1))
             title = heading_match.group(2).strip()
+            if ANSWER_HEADING_RE.fullmatch(title) and section_lines:
+                section_lines.append(line)
+                continue
+            flush()
             headings = [item for item in headings if item[0] < level]
             headings.append((level, title))
             section_heading = " > ".join(item[1] for item in headings)

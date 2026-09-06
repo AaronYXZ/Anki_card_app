@@ -95,6 +95,32 @@ Another paragraph.
     assert [chunk.sequence for chunk in chunks] == list(range(len(chunks)))
 
 
+def test_chunk_markdown_keeps_answer_heading_with_its_question() -> None:
+    content = """# Experimentation
+### Question
+What is contamination?
+
+### Answer
+Contamination means users in one group see the other group's experience.
+
+Example:
+- A control user sees treatment behavior.
+- A treatment user shares a promotion with a control user.
+
+### Next concept
+What is interference?
+"""
+
+    chunks = chunk_markdown(content)
+
+    assert len(chunks) == 3
+    assert chunks[1].heading_path == "Experimentation > Question"
+    assert "### Question" in chunks[1].text
+    assert "### Answer" in chunks[1].text
+    assert "A control user sees treatment behavior" in chunks[1].text
+    assert chunks[2].heading_path == "Experimentation > Next concept"
+
+
 def test_chunk_markdown_splits_long_unbroken_text_and_empty() -> None:
     chunks = chunk_markdown("x" * 25, max_chars=10)
     assert [len(chunk.text) for chunk in chunks] == [10, 10, 5]

@@ -100,6 +100,11 @@ def _select_due_card_ids(
     if limit <= 0:
         return []
     excluded = excluded_ids or set()
+    excluded_note_ids = set(
+        session.scalars(
+            select(Card.note_id).where(Card.id.in_(excluded), Card.note_id.is_not(None))
+        )
+    )
     filters = [
         Card.user_id == user_id,
         Card.state == CardState.ACTIVE,
@@ -109,14 +114,39 @@ def _select_due_card_ids(
         filters.append(Card.card_type == card_type)
     if excluded:
         filters.append(Card.id.not_in(excluded))
+    if excluded_note_ids:
+        filters.append((Card.note_id.is_(None)) | (Card.note_id.not_in(excluded_note_ids)))
 
-    reviewed_ids = session.scalars(
-        select(Card.id)
+    reviewed_rows = session.execute(
+        select(Card.id, Card.note_id)
         .join(SchedulingState, SchedulingState.card_id == Card.id)
         .where(*filters, SchedulingState.review_count > 0)
         .order_by(SchedulingState.due_at, Card.created_at, Card.id)
-        .limit(limit)
     ).all()
+
+    def bury_siblings(
+        rows: list[tuple[uuid.UUID, uuid.UUID | None]],
+        *,
+        maximum: int,
+        seen_notes: set[uuid.UUID],
+    ) -> list[uuid.UUID]:
+        chosen: list[uuid.UUID] = []
+        for card_id, note_id in rows:
+            if note_id is not None and note_id in seen_notes:
+                continue
+            chosen.append(card_id)
+            if note_id is not None:
+                seen_notes.add(note_id)
+            if len(chosen) == maximum:
+                break
+        return chosen
+
+    seen_note_ids = {note_id for note_id in excluded_note_ids if note_id is not None}
+    reviewed_ids = bury_siblings(
+        [(card_id, note_id) for card_id, note_id in reviewed_rows],
+        maximum=limit,
+        seen_notes=seen_note_ids,
+    )
     remaining = limit - len(reviewed_ids)
     if remaining == 0:
         return list(reviewed_ids)
@@ -131,13 +161,17 @@ def _select_due_card_ids(
         new_filters.append(Card.card_type == card_type)
     if new_excluded:
         new_filters.append(Card.id.not_in(new_excluded))
-    new_ids = session.scalars(
-        select(Card.id)
+    new_rows = session.execute(
+        select(Card.id, Card.note_id)
         .join(SchedulingState, SchedulingState.card_id == Card.id)
         .where(*new_filters)
         .order_by(SchedulingState.due_at, Card.created_at, Card.id)
-        .limit(remaining)
     ).all()
+    new_ids = bury_siblings(
+        [(card_id, note_id) for card_id, note_id in new_rows],
+        maximum=remaining,
+        seen_notes=seen_note_ids,
+    )
     return [*reviewed_ids, *new_ids]
 
 

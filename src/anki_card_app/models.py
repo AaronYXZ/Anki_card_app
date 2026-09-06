@@ -32,6 +32,10 @@ class CardType(StrEnum):
     SKELETON_RECALL = "skeleton_recall"
 
 
+class NoteType(StrEnum):
+    LEETCODE = "leetcode"
+
+
 class CardState(StrEnum):
     DRAFT = "draft"
     ACTIVE = "active"
@@ -78,6 +82,12 @@ chunk_generation_status_enum = Enum(
     native_enum=False,
     values_callable=lambda members: [member.value for member in members],
     length=16,
+)
+note_type_enum = Enum(
+    NoteType,
+    native_enum=False,
+    values_callable=lambda members: [member.value for member in members],
+    length=32,
 )
 
 
@@ -180,6 +190,21 @@ class GenerationRun(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class StudyNote(Base):
+    __tablename__ = "study_notes"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user_accounts.id", ondelete="CASCADE"), index=True
+    )
+    note_type: Mapped[NoteType] = mapped_column(note_type_enum, index=True)
+    fields: Mapped[dict[str, Any]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+
 class Card(Base):
     __tablename__ = "cards"
     __table_args__ = (
@@ -188,6 +213,12 @@ class Card(Base):
             "card_type IN ('normal', 'cloze', 'skeleton_recall')",
             name="ck_cards_card_type",
         ),
+        CheckConstraint(
+            "(note_id IS NULL AND template_key IS NULL) OR "
+            "(note_id IS NOT NULL AND template_key IS NOT NULL)",
+            name="ck_cards_note_template_pair",
+        ),
+        UniqueConstraint("note_id", "template_key", name="uq_cards_note_template"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -203,6 +234,10 @@ class Card(Base):
     generation_run_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("generation_runs.id", ondelete="SET NULL"), index=True
     )
+    note_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("study_notes.id", ondelete="CASCADE"), index=True
+    )
+    template_key: Mapped[str | None] = mapped_column(String(32))
     content_fingerprint: Mapped[str | None] = mapped_column(String(64))
     card_type: Mapped[CardType] = mapped_column(card_type_enum)
     state: Mapped[CardState] = mapped_column(card_state_enum, default=CardState.DRAFT, index=True)

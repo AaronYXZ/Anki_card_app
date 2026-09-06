@@ -31,6 +31,8 @@ def test_dashboard_and_empty_workflows(client: TestClient) -> None:
 
     assert dashboard.status_code == 200
     assert "0 cards are ready" in dashboard.text
+    assert '/static/app.css?v=16' in dashboard.text
+    assert '/static/app.js?v=16' in dashboard.text
     assert "30-day first-attempt recall" in dashboard.text
     assert "N/A" in dashboard.text
     assert "No drafts waiting" in drafts.text
@@ -40,11 +42,101 @@ def test_dashboard_and_empty_workflows(client: TestClient) -> None:
     assert "Nothing is due" in review.text
     assert "Create a card" in new_card.text
     assert "Skeleton Recall" in new_card.text
+    assert "LeetCode Problem" in new_card.text
     assert install.status_code == 200
     assert "Add to Home Screen" in install.text
     assert "Online connection required" in install.text
     assert "/manifest.webmanifest" in install.text
     assert "/static/app.js" in install.text
+
+
+def test_leetcode_form_creates_pattern_python_and_follow_up_drafts(
+    client: TestClient, db_session: Session
+) -> None:
+    response = client.post(
+        "/cards/new",
+        data={
+            "card_type": "leetcode",
+            "problem_id": "LC-209 Minimum Size Subarray Sum",
+            "problem_summary": "Find the shortest qualifying subarray. Values are positive.",
+            "pattern": "Variable sliding window",
+            "invariant": "Shrink until the window is minimal.",
+            "base_approach": "Expand right and shrink left while valid.",
+            "python_skeleton": "def solve(nums: list[int]) -> int:\n    return 0",
+            "complexity": "Time O(n), space O(1)",
+            "follow_up_1_question": "What if negatives are allowed?",
+            "follow_up_1_answer": "Use prefix sums and a monotonic deque. Time O(n).",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/cards/drafts"
+    cards = db_session.scalars(select(Card).order_by(Card.template_key)).all()
+    assert {card.template_key for card in cards} == {"pattern", "python", "follow_up_1"}
+    assert len({card.note_id for card in cards}) == 1
+    drafts = client.get("/cards/drafts")
+    assert "leetcode · pattern" in drafts.text
+    assert "What if negatives are allowed?" in drafts.text
+
+    pattern_card = next(card for card in cards if card.template_key == "pattern")
+    edit_from_drafts = client.get(f"/cards/{pattern_card.id}/edit")
+    assert edit_from_drafts.status_code == 200
+    assert "Add a follow-up" in edit_from_drafts.text
+    assert "What if negatives are allowed?" in edit_from_drafts.text
+
+    added_from_drafts = client.post(
+        f"/cards/{pattern_card.id}/edit",
+        data={
+            "follow_up_question": "Can we return the matching subarray?",
+            "follow_up_answer": "Track the best left and right boundaries.",
+        },
+        follow_redirects=False,
+    )
+    assert added_from_drafts.status_code == 303
+    added_card = db_session.scalar(select(Card).where(Card.template_key == "follow_up_2"))
+    assert added_card is not None
+    assert added_from_drafts.headers["location"] == f"/cards/drafts#card-{added_card.id}"
+
+    client.post(f"/cards/{pattern_card.id}/approve")
+    cards_page = client.get("/cards")
+    assert f'href="/cards/{pattern_card.id}/edit"' in cards_page.text
+    edit_from_cards = client.get(f"/cards/{pattern_card.id}/edit")
+    assert "Create follow-up draft" in edit_from_cards.text
+    assert 'href="/cards"' in edit_from_cards.text
+
+    added_from_cards = client.post(
+        f"/cards/{pattern_card.id}/edit",
+        data={
+            "follow_up_question": "What if the input is a stream?",
+            "follow_up_answer": "The answer depends on whether old values can be retained.",
+        },
+        follow_redirects=False,
+    )
+    assert added_from_cards.status_code == 303
+    assert db_session.scalar(select(Card).where(Card.template_key == "follow_up_3")) is not None
+
+
+def test_leetcode_form_accepts_an_empty_invariant(
+    client: TestClient, db_session: Session
+) -> None:
+    response = client.post(
+        "/cards/new",
+        data={
+            "card_type": "leetcode",
+            "problem_id": "LC-1 Two Sum",
+            "problem_summary": "Return indices of two values that sum to target.",
+            "pattern": "Hash map",
+            "invariant": "",
+            "base_approach": "Store each seen value and its index.",
+            "python_skeleton": "def two_sum(nums: list[int], target: int) -> list[int]:\n    pass",
+            "complexity": "Time O(n), space O(n)",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert db_session.scalar(select(Card).where(Card.template_key == "pattern")) is not None
 
 
 def test_primary_navigation_is_grouped_into_four_categories(client: TestClient) -> None:
@@ -113,6 +205,7 @@ def test_favorites_page_is_user_scoped_and_newest_first(
     other.is_favorite = True
     other.favorited_at = datetime(2026, 8, 27, 13, tzinfo=UTC)
     db_session.commit()
+    client.post(f"/cards/{newer.id}/approve")
 
     page = client.get("/favorites")
 
@@ -123,7 +216,31 @@ def test_favorites_page_is_user_scoped_and_newest_first(
     assert "Other user's favorite" not in page.text
     assert f'href="/cards/{newer.id}"' in page.text
     assert f'href="/cards/{newer.id}/edit"' in page.text
+    assert f'action="/favorites/{newer.id}/unlike"' in page.text
+    assert f'action="/favorites/{newer.id}/delete"' in page.text
+    assert ">Unlike</button>" in page.text
+    assert ">Delete</button>" in page.text
+    assert "Delete this card from learning?" in page.text
     assert hidden.is_favorite is False
+
+    unlike = client.post(f"/favorites/{older.id}/unlike", follow_redirects=False)
+    assert unlike.status_code == 303
+    assert unlike.headers["location"] == "/favorites"
+    db_session.refresh(older)
+    assert older.is_favorite is False
+    assert older.state is CardState.DRAFT
+
+    deleted = client.post(f"/favorites/{newer.id}/delete", follow_redirects=False)
+    assert deleted.status_code == 303
+    assert deleted.headers["location"] == "/favorites"
+    db_session.refresh(newer)
+    assert newer.is_favorite is False
+    assert newer.state is CardState.RETIRED
+
+    updated_page = client.get("/favorites")
+    assert "Older favorite" not in updated_page.text
+    assert "Newer favorite" not in updated_page.text
+    assert "Newer favorite" not in client.get("/review").text
 
 
 def test_normal_card_create_edit_approve_and_review(

@@ -27,9 +27,18 @@ from anki_card_app.card_service import (
     get_current_version,
     get_owned_card,
     reject_card,
+    remove_card_from_learning,
     set_card_favorite,
 )
 from anki_card_app.database import get_session
+from anki_card_app.leetcode_service import (
+    LeetCodeFollowUp,
+    LeetCodeNoteContent,
+    add_leetcode_follow_up,
+    create_leetcode_note,
+    get_owned_leetcode_note,
+    leetcode_content_from_note,
+)
 from anki_card_app.markdown import render_markdown
 from anki_card_app.models import (
     Card,
@@ -178,7 +187,9 @@ def parse_card_type(value: str) -> CardType:
     try:
         return CardType(value)
     except ValueError as error:
-        raise CardValidationError("Choose Normal, Cloze, or Skeleton Recall.") from error
+        raise CardValidationError(
+            "Choose Normal, Cloze, or Skeleton Recall. LeetCode Problem is also available."
+        ) from error
 
 
 def raise_http_card_error(error: CardError) -> NoReturn:
@@ -222,6 +233,19 @@ def create_card_action(
     back: Annotated[str, Form()] = "",
     cloze_text: Annotated[str, Form()] = "",
     back_extra: Annotated[str, Form()] = "",
+    problem_id: Annotated[str, Form()] = "",
+    problem_summary: Annotated[str, Form()] = "",
+    pattern: Annotated[str, Form()] = "",
+    invariant: Annotated[str, Form()] = "",
+    base_approach: Annotated[str, Form()] = "",
+    python_skeleton: Annotated[str, Form()] = "",
+    complexity: Annotated[str, Form()] = "",
+    follow_up_1_question: Annotated[str, Form()] = "",
+    follow_up_1_answer: Annotated[str, Form()] = "",
+    follow_up_2_question: Annotated[str, Form()] = "",
+    follow_up_2_answer: Annotated[str, Form()] = "",
+    follow_up_3_question: Annotated[str, Form()] = "",
+    follow_up_3_answer: Annotated[str, Form()] = "",
 ) -> Response:
     user_id = current_user_id(request, session)
     form_values = {
@@ -230,19 +254,52 @@ def create_card_action(
         "back": back,
         "cloze_text": cloze_text,
         "back_extra": back_extra,
+        "problem_id": problem_id,
+        "problem_summary": problem_summary,
+        "pattern": pattern,
+        "invariant": invariant,
+        "base_approach": base_approach,
+        "python_skeleton": python_skeleton,
+        "complexity": complexity,
+        "follow_up_1_question": follow_up_1_question,
+        "follow_up_1_answer": follow_up_1_answer,
+        "follow_up_2_question": follow_up_2_question,
+        "follow_up_2_answer": follow_up_2_answer,
+        "follow_up_3_question": follow_up_3_question,
+        "follow_up_3_answer": follow_up_3_answer,
     }
     try:
-        create_draft(
-            session,
-            user_id=user_id,
-            card_type=parse_card_type(card_type),
-            content=CardContent(
-                front=front,
-                back=back,
-                cloze_text=cloze_text,
-                back_extra=back_extra,
-            ),
-        )
+        if card_type == "leetcode":
+            create_leetcode_note(
+                session,
+                user_id=user_id,
+                content=LeetCodeNoteContent(
+                    problem_id=problem_id,
+                    problem_summary=problem_summary,
+                    pattern=pattern,
+                    invariant=invariant,
+                    base_approach=base_approach,
+                    python_skeleton=python_skeleton,
+                    complexity=complexity,
+                    follow_ups=(
+                        LeetCodeFollowUp(follow_up_1_question, follow_up_1_answer),
+                        LeetCodeFollowUp(follow_up_2_question, follow_up_2_answer),
+                        LeetCodeFollowUp(follow_up_3_question, follow_up_3_answer),
+                    ),
+                ),
+            )
+        else:
+            create_draft(
+                session,
+                user_id=user_id,
+                card_type=parse_card_type(card_type),
+                content=CardContent(
+                    front=front,
+                    back=back,
+                    cloze_text=cloze_text,
+                    back_extra=back_extra,
+                ),
+            )
         session.commit()
     except CardError as error:
         session.rollback()
@@ -294,6 +351,39 @@ def favorite_cards(request: Request, session: SessionDependency) -> HTMLResponse
     )
 
 
+@router.post("/favorites/{card_id}/unlike", dependencies=[Depends(validate_csrf)])
+def unlike_favorite_card(
+    request: Request, card_id: uuid.UUID, session: SessionDependency
+) -> RedirectResponse:
+    user_id = current_user_id(request, session)
+    try:
+        set_card_favorite(
+            session,
+            user_id=user_id,
+            card_id=card_id,
+            is_favorite=False,
+        )
+        session.commit()
+    except CardError as error:
+        session.rollback()
+        raise_http_card_error(error)
+    return RedirectResponse("/favorites", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/favorites/{card_id}/delete", dependencies=[Depends(validate_csrf)])
+def delete_favorite_card(
+    request: Request, card_id: uuid.UUID, session: SessionDependency
+) -> RedirectResponse:
+    user_id = current_user_id(request, session)
+    try:
+        remove_card_from_learning(session, user_id=user_id, card_id=card_id)
+        session.commit()
+    except CardError as error:
+        session.rollback()
+        raise_http_card_error(error)
+    return RedirectResponse("/favorites", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @router.get("/cards/{card_id}", response_class=HTMLResponse)
 def card_preview(
     request: Request,
@@ -322,6 +412,18 @@ def edit_card_form(
     user_id = current_user_id(request, session)
     try:
         card = get_owned_card(session, user_id=user_id, card_id=card_id)
+        if card.note_id is not None:
+            note = get_owned_leetcode_note(session, user_id=user_id, note_id=card.note_id)
+            return templates.TemplateResponse(
+                request=request,
+                name="leetcode_note_form.html",
+                context={
+                    "card": card,
+                    "content": leetcode_content_from_note(note),
+                    "error": None,
+                    "form_values": {},
+                },
+            )
         version = get_current_version(session, card)
     except CardError as error:
         raise_http_card_error(error)
@@ -341,10 +443,23 @@ def edit_card_action(
     back: Annotated[str, Form()] = "",
     cloze_text: Annotated[str, Form()] = "",
     back_extra: Annotated[str, Form()] = "",
+    follow_up_question: Annotated[str, Form()] = "",
+    follow_up_answer: Annotated[str, Form()] = "",
 ) -> Response:
     user_id = current_user_id(request, session)
     try:
         card = get_owned_card(session, user_id=user_id, card_id=card_id)
+        if card.note_id is not None:
+            new_card = add_leetcode_follow_up(
+                session,
+                user_id=user_id,
+                note_id=card.note_id,
+                follow_up=LeetCodeFollowUp(follow_up_question, follow_up_answer),
+            )
+            session.commit()
+            return RedirectResponse(
+                draft_destination(new_card.id), status_code=status.HTTP_303_SEE_OTHER
+            )
         edit_card(
             session,
             user_id=user_id,
@@ -361,6 +476,22 @@ def edit_card_action(
         session.rollback()
         if isinstance(error, CardNotFoundError):
             raise_http_card_error(error)
+        if card.note_id is not None:
+            note = get_owned_leetcode_note(session, user_id=user_id, note_id=card.note_id)
+            return templates.TemplateResponse(
+                request=request,
+                name="leetcode_note_form.html",
+                context={
+                    "card": card,
+                    "content": leetcode_content_from_note(note),
+                    "error": str(error),
+                    "form_values": {
+                        "follow_up_question": follow_up_question,
+                        "follow_up_answer": follow_up_answer,
+                    },
+                },
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            )
         return templates.TemplateResponse(
             request=request,
             name="card_form.html",

@@ -194,6 +194,27 @@ def test_restore_old_backup_defaults_missing_favorites_to_false(db_session: Sess
     assert all(card.favorited_at is None for card in restored_cards)
 
 
+def test_restore_accepts_format_one_backup_without_study_notes(db_session: Session) -> None:
+    source_user = UserAccount(email="v1-source@example.com")
+    target_user = UserAccount(email="v1-target@example.com")
+    db_session.add_all([source_user, target_user])
+    db_session.flush()
+    payload = _complete_export(db_session, user=source_user)
+    payload["format_version"] = 1
+    del payload["data"]["study_notes"]
+    for card in payload["data"]["cards"]:
+        del card["note_id"]
+        del card["template_key"]
+
+    result = restore_user_export(db_session, user_id=target_user.id, payload=payload)
+    db_session.commit()
+
+    assert result.counts["study_notes"] == 0
+    restored_cards = db_session.scalars(select(Card).where(Card.user_id == target_user.id)).all()
+    assert restored_cards
+    assert all(card.note_id is None and card.template_key is None for card in restored_cards)
+
+
 def test_restore_rejects_nonempty_account_without_changing_it(db_session: Session) -> None:
     source_user = UserAccount(email="source@example.com")
     target_user = UserAccount(email="target@example.com")

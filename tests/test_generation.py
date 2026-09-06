@@ -17,6 +17,7 @@ from anki_card_app.generation import (
     GenerationResult,
     OpenAICardGenerator,
     create_generation_run,
+    extract_authored_qa_cards,
     process_generation_run,
 )
 from anki_card_app.import_service import MarkdownSource, import_markdown
@@ -75,14 +76,102 @@ class FakeGenerator:
         return GenerationResult(cards=cards, request_id=f"request-{chunk.sequence}")
 
 
-def test_generation_prompt_rejects_example_specific_card_material() -> None:
-    assert PROMPT_VERSION == "anki-v5-math-rendering"
-    assert "supporting context, not as default card material" in CARD_GENERATION_PROMPT
+def test_generation_prompt_keeps_helpful_context_without_atomizing_examples() -> None:
+    assert PROMPT_VERSION == "anki-v8-authored-answer-parser"
+    assert "explicitly authored question-and-answer block" in CARD_GENERATION_PROMPT
+    assert "Answer:`" in CARD_GENERATION_PROMPT
+    assert "Use the complete coherent content after the answer label" in CARD_GENERATION_PROMPT
+    assert "Preserve the author's wording, Markdown, order, examples, formulas" in (
+        CARD_GENERATION_PROMPT
+    )
+    assert "Do not summarize, paraphrase, shorten" in CARD_GENERATION_PROMPT
+    assert "take priority over the general synthesis rules" in CARD_GENERATION_PROMPT
+    assert "supporting context rather than separate facts to memorize" in CARD_GENERATION_PROMPT
     assert "Never generalize a rule from a single example" in CARD_GENERATION_PROMPT
-    assert "Never atomize its incidental details into cards" in CARD_GENERATION_PROMPT
+    assert "Never atomize its incidental details" in CARD_GENERATION_PROMPT
+    assert "not just a one-line definition" in CARD_GENERATION_PROMPT
+    assert "include the most useful one or a compact representative" in CARD_GENERATION_PROMPT
+    assert "each shows a distinct mechanism" in CARD_GENERATION_PROMPT
+    assert "Do not move essential explanatory examples only to ai_enrichment" in (
+        CARD_GENERATION_PROMPT
+    )
+    assert "source-supported formula when it helps understanding" in CARD_GENERATION_PROMPT
+    assert 'asking "What is contamination?"' in CARD_GENERATION_PROMPT
+    assert "retain one or more compact exposure scenarios" in CARD_GENERATION_PROMPT
     assert "Preserve useful Markdown from the source" in CARD_GENERATION_PROMPT
     assert "including its original Markdown" in CARD_GENERATION_PROMPT
     assert "Wrap generated inline LaTeX" in CARD_GENERATION_PROMPT
+
+
+def test_explicit_answer_block_is_used_directly_with_examples_and_formula() -> None:
+    source = """### Contamination
+
+Question:
+What is contamination?
+
+Answer:
+Contamination means users in one group are exposed to the other group's experience.
+
+Example:
+
+- A control user still sees treatment behavior.
+- A treatment user shares a promotion with a control user.
+
+Formula:
+$\\hat{\\tau}_{obs} \\approx (1-c)\\tau$
+"""
+
+    cards = extract_authored_qa_cards(source)
+
+    assert len(cards) == 1
+    assert cards[0].front == "What is contamination?"
+    assert cards[0].back == (
+        "Contamination means users in one group are exposed to the other group's experience."
+        "\n\nExample:\n\n- A control user still sees treatment behavior."
+        "\n- A treatment user shares a promotion with a control user."
+        "\n\nFormula:\n$\\hat{\\tau}_{obs} \\approx (1-c)\\tau$"
+    )
+    assert cards[0].source_excerpt in source
+
+
+def test_explicit_markdown_qa_headings_and_inline_labels_are_detected() -> None:
+    source = """### Question
+What is lift?
+### Answer
+Lift is the relative change in a metric.
+
+Q: What is guardrail metric?
+A: A metric used to detect unacceptable side effects.
+"""
+
+    cards = extract_authored_qa_cards(source)
+
+    assert [(card.front, card.back) for card in cards] == [
+        ("What is lift?", "Lift is the relative change in a metric."),
+        ("What is guardrail metric?", "A metric used to detect unacceptable side effects."),
+    ]
+
+
+def test_openai_adapter_bypasses_model_for_explicit_authored_answer() -> None:
+    class Responses:
+        def parse(self, **kwargs: object) -> object:
+            raise AssertionError("The model must not rewrite an authored answer.")
+
+    generator = OpenAICardGenerator.__new__(OpenAICardGenerator)
+    generator.model = "test-model"
+    generator._client = type("Client", (), {"responses": Responses()})()
+    chunk = SourceChunk(
+        source_document_id=uuid.uuid4(),
+        sequence=0,
+        text="Question: What is contamination?\nAnswer: Cross-group exposure.",
+    )
+
+    result = generator.generate(chunk)
+
+    assert len(result.cards) == 1
+    assert result.cards[0].front == "What is contamination?"
+    assert result.cards[0].back == "Cross-group exposure."
+    assert result.request_id is None
 
 
 def setup_run(db_session: Session) -> tuple[uuid.UUID, uuid.UUID]:
