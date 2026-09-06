@@ -22,6 +22,7 @@ from anki_card_app.generation import (
     create_generation_run,
     extract_authored_qa_cards,
     process_generation_run,
+    resolve_source_evidence,
 )
 from anki_card_app.import_service import MarkdownSource, import_markdown
 from anki_card_app.models import (
@@ -175,7 +176,7 @@ def behavioral_cards() -> list[GeneratedCard]:
 
 
 def test_behavioral_batch_requires_main_story_four_carl_and_shared_metadata() -> None:
-    assert BEHAVIORAL_PROMPT_VERSION == "behavioral-v1"
+    assert BEHAVIORAL_PROMPT_VERSION == "behavioral-v2-evidence-recovery"
     batch = BehavioralGeneratedCardBatch(cards=behavioral_cards())
 
     assert len(batch.cards) == 6
@@ -210,6 +211,23 @@ def test_behavioral_openai_adapter_uses_dedicated_prompt_and_complete_source() -
 
     assert result.cards == batch.cards
     assert result.request_id == "req_behavioral"
+
+
+def test_behavioral_evidence_recovers_exact_source_span_from_card_content() -> None:
+    source = "I coordinated the launch across\nmultiple teams and preserved the deadline."
+    candidate = GeneratedCard(
+        card_type="behavioral_carl",
+        front="Launch\n\nActions",
+        back="I coordinated the launch across multiple teams and preserved the deadline.",
+        source_excerpt="I coordinated a launch across several teams.",
+        story_id="launch",
+        story_name="Launch",
+        card_role="CARL::Actions",
+    )
+
+    evidence = resolve_source_evidence(candidate, source)
+
+    assert evidence == source
 
 
 def test_explicit_markdown_qa_headings_and_inline_labels_are_detected() -> None:
@@ -344,7 +362,12 @@ def test_behavioral_run_saves_story_metadata_tags_and_main_link(db_session: Sess
         model = "test-model"
 
         def generate(self, chunk: SourceChunk) -> GenerationResult:
-            return GenerationResult(cards=behavioral_cards())
+            return GenerationResult(
+                cards=[
+                    card.model_copy(update={"source_excerpt": "Not verbatim evidence."})
+                    for card in behavioral_cards()
+                ]
+            )
 
     completed = process_generation_run(
         db_session,
@@ -359,6 +382,11 @@ def test_behavioral_run_saves_story_metadata_tags_and_main_link(db_session: Sess
     assert completed.generated_cards == 6
     assert all(card.story_id == "launch-conflict" for card in cards)
     assert all(card.tags == ["behavioral::story::launch-conflict"] for card in cards)
+    versions = db_session.scalars(select(CardVersion)).all()
+    assert all(
+        version.source_excerpt is not None and version.source_excerpt in source_text
+        for version in versions
+    )
     assert all(
         card.main_story_card_id == main.id
         for card in cards

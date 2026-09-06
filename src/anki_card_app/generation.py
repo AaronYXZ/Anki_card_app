@@ -37,7 +37,7 @@ from anki_card_app.models import (
 )
 
 PROMPT_VERSION = "anki-v8-authored-answer-parser"
-BEHAVIORAL_PROMPT_VERSION = "behavioral-v1"
+BEHAVIORAL_PROMPT_VERSION = "behavioral-v2-evidence-recovery"
 AUTHORED_LABEL_RE = re.compile(
     r"^(?:#{1,6}[ \t]+)?"
     r"(?P<label>question|q|prompt|answer|a|response|solution)"
@@ -165,9 +165,10 @@ the Main Story name and Story ID.
 Before returning, verify there is one Main Story and exactly four CARL cards, every listed
 variation and follow-up has a card, all extracted answers use exact source wording, the
 summary has four or five exact source sentences, every child shares the same Story ID,
-all numbers match, and nothing was silently omitted. Use a short exact source substring as
-`source_excerpt` for every card. Return cards in this order: Main Story, four CARL cards,
-variations, then follow-ups.
+all numbers match, and nothing was silently omitted. For every `source_excerpt`, copy one
+short verbatim span of 8 to 40 words from the source. Do not add labels, quotation marks,
+ellipses, or normalized punctuation to that span. Return cards in this order: Main Story,
+four CARL cards, variations, then follow-ups.
 """.strip()
 
 
@@ -324,6 +325,53 @@ def extract_authored_qa_cards(text: str) -> list[GeneratedCard]:
         if len(cards) == 20:
             break
     return cards
+
+
+def _evidence_fragments(text: str | None) -> list[str]:
+    if not text:
+        return []
+    fragments: list[str] = []
+    for line in text.splitlines():
+        cleaned = re.sub(r"^(?:#{1,6}|[-*+] |\d+[.)] )\s*", "", line.strip())
+        if cleaned:
+            fragments.append(cleaned)
+            fragments.extend(
+                sentence.strip()
+                for sentence in re.split(r"(?<=[.!?])\s+", cleaned)
+                if sentence.strip()
+            )
+    return fragments
+
+
+def _exact_source_span(fragment: str, source_text: str) -> str | None:
+    candidate = fragment.strip()
+    if len(candidate) < 8:
+        return None
+    if candidate in source_text:
+        return candidate
+    words = candidate.split()
+    if len(words) < 2:
+        return None
+    match = re.search(r"\s+".join(re.escape(word) for word in words), source_text)
+    return match.group(0) if match is not None else None
+
+
+def resolve_source_evidence(candidate: GeneratedCard, source_text: str) -> str | None:
+    supplied = _exact_source_span(candidate.source_excerpt, source_text)
+    if supplied is not None:
+        return supplied
+    seen: set[str] = set()
+    for fragment in [
+        *_evidence_fragments(candidate.back),
+        *_evidence_fragments(candidate.front),
+    ]:
+        if fragment in seen:
+            continue
+        seen.add(fragment)
+        evidence = _exact_source_span(fragment, source_text)
+        if evidence is not None:
+            return evidence
+    return None
 
 
 class CardGenerator(Protocol):
@@ -504,7 +552,16 @@ def _save_candidates(
         )
     )
     for candidate in ordered_candidates:
-        if candidate.source_excerpt not in source_text:
+        source_excerpt = (
+            candidate.source_excerpt
+            if candidate.source_excerpt in source_text
+            else (
+                resolve_source_evidence(candidate, source_text)
+                if run.generation_profile is GenerationProfile.BEHAVIORAL
+                else None
+            )
+        )
+        if source_excerpt is None:
             if run.generation_profile is GenerationProfile.BEHAVIORAL:
                 raise CardValidationError(
                     "Behavioral generation returned a card without exact source evidence."
@@ -530,7 +587,7 @@ def _save_candidates(
                 source_document_id=run.source_document_id,
                 source_chunk_id=chunk.id,
                 generation_run_id=run.id,
-                source_excerpt=candidate.source_excerpt,
+                source_excerpt=source_excerpt,
                 ai_enrichment=candidate.ai_enrichment,
                 tags=(
                     [f"behavioral::story::{candidate.story_id}"]
