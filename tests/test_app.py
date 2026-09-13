@@ -47,9 +47,9 @@ def test_pwa_resources_are_served_from_root_scope() -> None:
     assert service_worker.status_code == 200
     assert service_worker.headers["service-worker-allowed"] == "/"
     assert "no-cache" in service_worker.headers["cache-control"]
-    assert 'CACHE_NAME = "anki-shell-v17"' in service_worker.text
-    assert '"/static/app.css?v=17"' in service_worker.text
-    assert '"/static/app.js?v=17"' in service_worker.text
+    assert 'CACHE_NAME = "anki-shell-v18"' in service_worker.text
+    assert '"/static/app.css?v=18"' in service_worker.text
+    assert '"/static/app.js?v=18"' in service_worker.text
     assert 'request.method !== "GET"' in service_worker.text
     assert 'caches.match("/static/offline.html")' in service_worker.text
     assert styles.status_code == 200

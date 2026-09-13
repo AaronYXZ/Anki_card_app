@@ -518,12 +518,20 @@ def edit_card_action(
 
 @router.post("/cards/{card_id}/approve", dependencies=[Depends(validate_csrf)])
 def approve_card_action(
-    request: Request, card_id: uuid.UUID, session: SessionDependency
+    request: Request,
+    card_id: uuid.UUID,
+    session: SessionDependency,
+    keep_source: Annotated[bool, Form()] = True,
 ) -> RedirectResponse:
     user_id = current_user_id(request, session)
     next_card_id = adjacent_draft_id(session, user_id=user_id, card_id=card_id)
     try:
-        approve_card(session, user_id=user_id, card_id=card_id)
+        approve_card(
+            session,
+            user_id=user_id,
+            card_id=card_id,
+            keep_source=keep_source,
+        )
         session.commit()
     except CardError as error:
         session.rollback()

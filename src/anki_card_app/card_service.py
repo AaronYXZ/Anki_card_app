@@ -305,6 +305,7 @@ def approve_card(
     user_id: uuid.UUID,
     card_id: uuid.UUID,
     due_at: datetime | None = None,
+    keep_source: bool = True,
 ) -> Card:
     card = get_owned_card(session, user_id=user_id, card_id=card_id)
     if card.state is not CardState.DRAFT:
@@ -317,10 +318,10 @@ def approve_card(
         cloze_text=version.cloze_text,
         back_extra=version.back_extra,
     )
-    sourced_content = _content_with_source(
-        card.card_type,
-        current_content,
-        version.source_excerpt,
+    sourced_content = (
+        _content_with_source(card.card_type, current_content, version.source_excerpt)
+        if keep_source
+        else current_content
     )
     if sourced_content != current_content:
         sourced_fingerprint = content_fingerprint(card.card_type, sourced_content)

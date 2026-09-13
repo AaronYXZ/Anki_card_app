@@ -249,6 +249,26 @@ def test_approval_appends_source_to_normal_and_cloze_draft_backs(
     assert normal_original.back == "Normal answer"
     assert cloze_original.back_extra == "Existing context."
 
+
+def test_approval_can_leave_source_out_of_card_back(
+    db_session: Session, user_id: uuid.UUID
+) -> None:
+    card = create_draft(
+        db_session,
+        user_id=user_id,
+        card_type=CardType.NORMAL,
+        content=CardContent(front="Question", back="Answer"),
+        source_excerpt="Evidence that should remain draft-only.",
+    )
+    original = get_current_version(db_session, card)
+
+    approve_card(db_session, user_id=user_id, card_id=card.id, keep_source=False)
+
+    approved = get_current_version(db_session, card)
+    assert approved.id == original.id
+    assert approved.back == "Answer"
+    assert approved.source_excerpt == "Evidence that should remain draft-only."
+
 def test_reject_draft_blocks_editing(db_session: Session, user_id: uuid.UUID) -> None:
     card = create_normal_draft(db_session, user_id)
 

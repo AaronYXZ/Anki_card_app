@@ -31,8 +31,8 @@ def test_dashboard_and_empty_workflows(client: TestClient) -> None:
 
     assert dashboard.status_code == 200
     assert "0 cards are ready" in dashboard.text
-    assert '/static/app.css?v=17' in dashboard.text
-    assert '/static/app.js?v=17' in dashboard.text
+    assert '/static/app.css?v=18' in dashboard.text
+    assert '/static/app.js?v=18' in dashboard.text
     assert "30-day first-attempt recall" in dashboard.text
     assert "N/A" in dashboard.text
     assert "No drafts waiting" in drafts.text
@@ -674,6 +674,9 @@ def test_normal_and_cloze_draft_sources_render_below_actions(
 
     page = client.get("/cards/drafts")
 
+    assert page.text.count('class="button source-toggle"') == 2
+    assert page.text.count('name="keep_source" value="true" checked') == 2
+
     for card, excerpt in (
         (normal, "Normal source evidence."),
         (cloze, "Cloze source evidence."),
@@ -683,7 +686,15 @@ def test_normal_and_cloze_draft_sources_render_below_actions(
         article = page.text[article_start:article_end]
         assert article.index('class="actions"') < article.index(excerpt)
 
-    client.post(f"/cards/{cloze.id}/approve")
+    client.post(f"/cards/{normal.id}/approve", data={"keep_source": "false"})
+    normal_preview = client.get(f"/cards/{normal.id}")
+    assert "Normal answer" in normal_preview.text
+    assert "Normal source evidence." not in normal_preview.text
+
+    client.post(
+        f"/cards/{cloze.id}/approve",
+        data={"keep_source": ["false", "true"]},
+    )
     cloze_preview = client.get(f"/cards/{cloze.id}")
     assert "<h3>Source</h3>" in cloze_preview.text
     assert cloze_preview.text.index("Cloze source placement") < cloze_preview.text.index(

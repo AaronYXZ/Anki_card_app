@@ -17,7 +17,14 @@
             <details class="source-evidence"><summary>Compare with source</summary><div class="markdown-content source-markdown">{{ item.version.source_excerpt|markdown }}</div>{% if item.version.ai_enrichment %}<div class="markdown-content enrichment"><b>Extra context:</b>{{ item.version.ai_enrichment|markdown }}</div>{% endif %}</details>
           {% endif %}
           <div class="actions">
-            <form action="/cards/{{ item.card.id }}/approve" method="post"><input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}"><button class="button primary" type="submit">Approve</button></form>
+            <form class="approve-form" action="/cards/{{ item.card.id }}/approve" method="post">
+              <input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}">
+              <button class="button primary" type="submit">Approve</button>
+              {% if item.version.source_excerpt and item.card.card_type.value in ["normal", "cloze"] %}
+                <input type="hidden" name="keep_source" value="false">
+                <label class="button source-toggle"><input type="checkbox" name="keep_source" value="true" checked> Keep source</label>
+              {% endif %}
+            </form>
             <a class="button" href="/cards/{{ item.card.id }}/edit">Edit</a>
             <form action="/cards/{{ item.card.id }}/reject" method="post"><input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}"><button class="button danger" type="submit">Reject</button></form>
           </div>

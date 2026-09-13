@@ -1,7 +1,7 @@
-const CACHE_NAME = "anki-shell-v17";
+const CACHE_NAME = "anki-shell-v18";
 const SHELL_ASSETS = [
-  "/static/app.css?v=17",
-  "/static/app.js?v=17",
+  "/static/app.css?v=18",
+  "/static/app.js?v=18",
   "/static/favicon.svg",
   "/static/icon-192.png",
   "/static/icon-512.png",
