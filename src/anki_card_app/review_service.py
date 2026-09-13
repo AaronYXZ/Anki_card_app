@@ -313,7 +313,7 @@ def get_or_create_daily_session(
             )
         )
     )
-    card_ids = [*bonus_ids, *regular_ids]
+    card_ids = [*regular_ids, *bonus_ids]
     if not card_ids:
         return None
 
@@ -356,7 +356,11 @@ def get_next_entry(
             Card.user_id == user_id,
             Card.state == CardState.ACTIVE,
         )
-        .order_by(ReviewSessionCard.position)
+        .order_by(
+            ReviewSessionCard.revealed_at.is_(None),
+            ReviewSessionCard.is_bonus,
+            ReviewSessionCard.position,
+        )
         .limit(1)
     ).one_or_none()
     if row is None:

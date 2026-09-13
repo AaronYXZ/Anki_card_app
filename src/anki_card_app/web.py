@@ -354,7 +354,7 @@ def favorite_cards(request: Request, session: SessionDependency) -> HTMLResponse
 @router.post("/favorites/{card_id}/unlike", dependencies=[Depends(validate_csrf)])
 def unlike_favorite_card(
     request: Request, card_id: uuid.UUID, session: SessionDependency
-) -> RedirectResponse:
+) -> Response:
     user_id = current_user_id(request, session)
     try:
         set_card_favorite(
@@ -367,6 +367,8 @@ def unlike_favorite_card(
     except CardError as error:
         session.rollback()
         raise_http_card_error(error)
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     return RedirectResponse("/favorites", status_code=status.HTTP_303_SEE_OTHER)
 
 

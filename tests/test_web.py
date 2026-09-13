@@ -31,8 +31,8 @@ def test_dashboard_and_empty_workflows(client: TestClient) -> None:
 
     assert dashboard.status_code == 200
     assert "0 cards are ready" in dashboard.text
-    assert '/static/app.css?v=16' in dashboard.text
-    assert '/static/app.js?v=16' in dashboard.text
+    assert '/static/app.css?v=17' in dashboard.text
+    assert '/static/app.js?v=17' in dashboard.text
     assert "30-day first-attempt recall" in dashboard.text
     assert "N/A" in dashboard.text
     assert "No drafts waiting" in drafts.text
@@ -217,6 +217,8 @@ def test_favorites_page_is_user_scoped_and_newest_first(
     assert f'href="/cards/{newer.id}"' in page.text
     assert f'href="/cards/{newer.id}/edit"' in page.text
     assert f'action="/favorites/{newer.id}/unlike"' in page.text
+    assert "data-favorites-list" in page.text
+    assert "data-unlike-form" in page.text
     assert f'action="/favorites/{newer.id}/delete"' in page.text
     assert ">Unlike</button>" in page.text
     assert ">Delete</button>" in page.text
@@ -229,6 +231,20 @@ def test_favorites_page_is_user_scoped_and_newest_first(
     db_session.refresh(older)
     assert older.is_favorite is False
     assert older.state is CardState.DRAFT
+
+    newer.is_favorite = True
+    db_session.commit()
+    unlike_in_place = client.post(
+        f"/favorites/{newer.id}/unlike",
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    assert unlike_in_place.status_code == 204
+    assert unlike_in_place.content == b""
+    db_session.refresh(newer)
+    assert newer.is_favorite is False
+
+    newer.is_favorite = True
+    db_session.commit()
 
     deleted = client.post(f"/favorites/{newer.id}/delete", follow_redirects=False)
     assert deleted.status_code == 303
@@ -632,6 +648,80 @@ def test_imported_drafts_follow_their_original_note_order(
     )
     assert page.text.index("Question from paragraph two") < page.text.index(
         "Question from paragraph three"
+    )
+
+
+def test_normal_and_cloze_draft_sources_render_below_actions(
+    client: TestClient, db_session: Session
+) -> None:
+    client.get("/")
+    user_id = get_settings().development_user_id
+    normal = create_draft(
+        db_session,
+        user_id=user_id,
+        card_type=CardType.NORMAL,
+        content=CardContent(front="Normal source placement", back="Normal answer"),
+        source_excerpt="Normal source evidence.",
+    )
+    cloze = create_draft(
+        db_session,
+        user_id=user_id,
+        card_type=CardType.CLOZE,
+        content=CardContent(cloze_text="Cloze source {{c1::placement}}."),
+        source_excerpt="Cloze source evidence.",
+    )
+    db_session.commit()
+
+    page = client.get("/cards/drafts")
+
+    for card, excerpt in (
+        (normal, "Normal source evidence."),
+        (cloze, "Cloze source evidence."),
+    ):
+        article_start = page.text.index(f'id="card-{card.id}"')
+        article_end = page.text.index("</article>", article_start)
+        article = page.text[article_start:article_end]
+        assert article.index('class="actions"') < article.index(excerpt)
+
+    client.post(f"/cards/{cloze.id}/approve")
+    cloze_preview = client.get(f"/cards/{cloze.id}")
+    assert "<h3>Source</h3>" in cloze_preview.text
+    assert cloze_preview.text.index("Cloze source placement") < cloze_preview.text.index(
+        "Cloze source evidence."
+    )
+
+
+def test_approved_normal_card_shows_source_with_revealed_answer_and_preview(
+    client: TestClient, db_session: Session
+) -> None:
+    client.get("/")
+    user_id = get_settings().development_user_id
+    card = create_draft(
+        db_session,
+        user_id=user_id,
+        card_type=CardType.NORMAL,
+        content=CardContent(front="Source-backed question", back="Source-backed answer"),
+        source_excerpt="Exact source evidence.",
+    )
+    db_session.commit()
+    client.post(f"/cards/{card.id}/approve")
+
+    preview = client.get(f"/cards/{card.id}")
+    assert "<h3>Source</h3>" in preview.text
+    assert preview.text.index("Source-backed answer") < preview.text.index(
+        "Exact source evidence."
+    )
+
+    review = client.get("/review")
+    review_session = db_session.scalar(select(ReviewSession))
+    assert review_session is not None
+    assert "Exact source evidence." not in review.text
+    client.post(f"/review/{review_session.id}/{card.id}/reveal")
+
+    revealed = client.get("/review")
+    assert "<h3>Source</h3>" in revealed.text
+    assert revealed.text.index("Source-backed answer") < revealed.text.index(
+        "Exact source evidence."
     )
 
 

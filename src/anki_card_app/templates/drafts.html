@@ -13,7 +13,7 @@
           <div class="card-meta"><span class="pill">{% if item.card.note_id %}leetcode · {{ item.card.template_key|replace("_", " ") }}{% else %}{{ item.card.card_type.value|replace("_", " ") }}{% endif %}</span>{% if item.card.card_role %}<span>{{ item.card.card_role }}</span>{% endif %}{% if item.card.tags %}<span>{{ item.card.tags|join(", ") }}</span>{% endif %}{% if item.card.main_story_card_id %}<a href="/cards/{{ item.card.main_story_card_id }}">Main Story</a>{% endif %}<span>Version {{ item.version.version_number }}</span></div>
           <div class="markdown-content card-prompt{% if item.card.card_type.value == 'skeleton_recall' %} skeleton-prompt{% endif %}">{{ item.prompt|markdown }}</div>
           <div class="markdown-content answer-preview">{{ item.answer|markdown }}</div>
-          {% if item.version.source_excerpt %}
+          {% if item.version.source_excerpt and item.card.card_type.value not in ["normal", "cloze"] %}
             <details class="source-evidence"><summary>Compare with source</summary><div class="markdown-content source-markdown">{{ item.version.source_excerpt|markdown }}</div>{% if item.version.ai_enrichment %}<div class="markdown-content enrichment"><b>Extra context:</b>{{ item.version.ai_enrichment|markdown }}</div>{% endif %}</details>
           {% endif %}
           <div class="actions">
@@ -21,6 +21,9 @@
             <a class="button" href="/cards/{{ item.card.id }}/edit">Edit</a>
             <form action="/cards/{{ item.card.id }}/reject" method="post"><input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}"><button class="button danger" type="submit">Reject</button></form>
           </div>
+          {% if item.version.source_excerpt and item.card.card_type.value in ["normal", "cloze"] %}
+            <details class="source-evidence"><summary>Compare with source</summary><div class="markdown-content source-markdown">{{ item.version.source_excerpt|markdown }}</div>{% if item.version.ai_enrichment %}<div class="markdown-content enrichment"><b>Extra context:</b>{{ item.version.ai_enrichment|markdown }}</div>{% endif %}</details>
+          {% endif %}
         </article>
       {% endfor %}
     </div>

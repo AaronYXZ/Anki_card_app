@@ -212,6 +212,43 @@ def test_approve_initializes_due_scheduling_state(db_session: Session, user_id: 
         approve_card(db_session, user_id=user_id, card_id=card.id)
 
 
+def test_approval_appends_source_to_normal_and_cloze_draft_backs(
+    db_session: Session, user_id: uuid.UUID
+) -> None:
+    normal = create_draft(
+        db_session,
+        user_id=user_id,
+        card_type=CardType.NORMAL,
+        content=CardContent(front="Normal question", back="Normal answer"),
+        source_excerpt="Normal evidence.",
+    )
+    cloze = create_draft(
+        db_session,
+        user_id=user_id,
+        card_type=CardType.CLOZE,
+        content=CardContent(
+            cloze_text="A {{c1::cloze}} statement.",
+            back_extra="Existing context.",
+        ),
+        source_excerpt="Cloze evidence.",
+    )
+    normal_original = get_current_version(db_session, normal)
+    cloze_original = get_current_version(db_session, cloze)
+
+    approve_card(db_session, user_id=user_id, card_id=normal.id)
+    approve_card(db_session, user_id=user_id, card_id=cloze.id)
+
+    normal_approved = get_current_version(db_session, normal)
+    cloze_approved = get_current_version(db_session, cloze)
+    assert normal_approved.id != normal_original.id
+    assert normal_approved.back == "Normal answer\n\n---\n\n### Source\n\nNormal evidence."
+    assert cloze_approved.id != cloze_original.id
+    assert cloze_approved.back_extra == (
+        "Existing context.\n\n---\n\n### Source\n\nCloze evidence."
+    )
+    assert normal_original.back == "Normal answer"
+    assert cloze_original.back_extra == "Existing context."
+
 def test_reject_draft_blocks_editing(db_session: Session, user_id: uuid.UUID) -> None:
     card = create_normal_draft(db_session, user_id)
 

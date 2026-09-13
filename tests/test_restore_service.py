@@ -166,7 +166,7 @@ def test_restore_round_trip_preserves_learning_history_and_drafts(db_session: Se
     ).all()
     db_session.refresh(target_user)
     assert result.counts["cards"] == 2
-    assert result.counts["card_versions"] == 2
+    assert result.counts["card_versions"] == 3
     assert result.counts["review_logs"] == 1
     assert result.total_rows == sum(len(rows) for rows in payload["data"].values())
     assert {card.state for card in restored_cards} == {CardState.ACTIVE, CardState.DRAFT}
@@ -179,7 +179,7 @@ def test_restore_round_trip_preserves_learning_history_and_drafts(db_session: Se
     assert restored_child.main_story_card_id == restored_main.id
     assert restored_child.tags == ["behavioral::story::attention-story"]
     assert not source_card_ids.intersection(card.id for card in restored_cards)
-    assert {version.created_by for version in restored_versions} == {"ai"}
+    assert {version.created_by for version in restored_versions} == {"ai", "system"}
     assert restored_logs[0].rating == 3
     assert restored_logs[0].prior_state
     assert restored_logs[0].new_state

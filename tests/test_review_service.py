@@ -118,7 +118,7 @@ def test_queue_orders_due_reviews_before_new_and_resumes(db_session: Session) ->
     assert get_or_create_daily_session(db_session, user_id=user.id, now=NOW) is review_session
 
 
-def test_newly_approved_cards_are_bonus_reviews_beyond_daily_limit(
+def test_daily_reviews_come_before_newly_approved_bonus_cards(
     db_session: Session,
 ) -> None:
     user = make_user(db_session, daily_limit=2)
@@ -145,8 +145,49 @@ def test_newly_approved_cards_are_bonus_reviews_beyond_daily_limit(
         .order_by(ReviewSessionCard.position)
     ).all()
     assert review_session.queue_size == 5
-    assert {item.card_id for item in items[:3]} == {card.id for card in bonus_cards}
-    assert [item.is_bonus for item in items] == [True, True, True, False, False]
+    assert {item.card_id for item in items[:2]} == {card.id for card in regular_cards}
+    assert {item.card_id for item in items[2:]} == {card.id for card in bonus_cards}
+    assert [item.is_bonus for item in items] == [False, False, True, True, True]
+
+
+def test_existing_session_prioritizes_regular_cards_without_interrupting_revealed_card(
+    db_session: Session,
+) -> None:
+    user = make_user(db_session, daily_limit=1)
+    bonus_card = make_active_card(db_session, user, question="Existing bonus")
+    regular_card = make_active_card(db_session, user, question="Existing regular")
+    review_session = ReviewSession(
+        user_id=user.id,
+        queue_size=2,
+        reviewed_count=0,
+        started_at=NOW,
+    )
+    db_session.add(review_session)
+    db_session.flush()
+    bonus_item = ReviewSessionCard(
+        review_session_id=review_session.id,
+        card_id=bonus_card.id,
+        position=0,
+        is_bonus=True,
+    )
+    regular_item = ReviewSessionCard(
+        review_session_id=review_session.id,
+        card_id=regular_card.id,
+        position=1,
+        is_bonus=False,
+    )
+    db_session.add_all([bonus_item, regular_item])
+    db_session.flush()
+
+    entry = get_next_entry(db_session, user_id=user.id, session_id=review_session.id)
+    assert entry is not None
+    assert entry.card.id == regular_card.id
+
+    bonus_item.revealed_at = NOW
+    db_session.flush()
+    revealed_entry = get_next_entry(db_session, user_id=user.id, session_id=review_session.id)
+    assert revealed_entry is not None
+    assert revealed_entry.card.id == bonus_card.id
 
 
 def test_completed_bonus_review_does_not_reduce_regular_daily_quota(

@@ -20,6 +20,7 @@ from anki_card_app.models import (
 )
 
 CLOZE_PATTERN = re.compile(r"{{c[1-9]\d*::.+?}}", re.DOTALL)
+SOURCE_HEADING = "### Source"
 
 
 class CardError(ValueError):
@@ -100,6 +101,37 @@ def validate_content(card_type: CardType, content: CardContent) -> CardContent:
     if CLOZE_PATTERN.search(normalized.cloze_text) is None:
         raise CardValidationError("Cloze text must include a deletion such as {{c1::answer}}.")
     return normalized
+
+
+def _content_with_source(
+    card_type: CardType,
+    content: CardContent,
+    source_excerpt: str | None,
+) -> CardContent:
+    source = clean_optional(source_excerpt)
+    if source is None or card_type not in {CardType.NORMAL, CardType.CLOZE}:
+        return content
+    source_section = f"{SOURCE_HEADING}\n\n{source}"
+    if card_type is CardType.NORMAL:
+        back = content.back or ""
+        if source_section in back:
+            return content
+        return CardContent(
+            front=content.front,
+            back=f"{back.rstrip()}\n\n---\n\n{source_section}",
+            cloze_text=content.cloze_text,
+            back_extra=content.back_extra,
+        )
+    back_extra = content.back_extra or ""
+    if source_section in back_extra:
+        return content
+    separator = "\n\n---\n\n" if back_extra else ""
+    return CardContent(
+        front=content.front,
+        back=content.back,
+        cloze_text=content.cloze_text,
+        back_extra=f"{back_extra.rstrip()}{separator}{source_section}",
+    )
 
 
 def get_owned_card(session: Session, *, user_id: uuid.UUID, card_id: uuid.UUID) -> Card:
@@ -279,6 +311,46 @@ def approve_card(
         raise InvalidCardTransitionError("Only draft cards can be approved.")
 
     version = get_current_version(session, card)
+    current_content = CardContent(
+        front=version.front,
+        back=version.back,
+        cloze_text=version.cloze_text,
+        back_extra=version.back_extra,
+    )
+    sourced_content = _content_with_source(
+        card.card_type,
+        current_content,
+        version.source_excerpt,
+    )
+    if sourced_content != current_content:
+        sourced_fingerprint = content_fingerprint(card.card_type, sourced_content)
+        if session.scalar(
+            select(Card.id).where(
+                Card.user_id == user_id,
+                Card.id != card.id,
+                Card.content_fingerprint == sourced_fingerprint,
+            )
+        ):
+            raise CardValidationError("An exact duplicate card already exists.")
+        latest_version = session.scalar(
+            select(func.max(CardVersion.version_number)).where(CardVersion.card_id == card.id)
+        )
+        version = CardVersion(
+            card_id=card.id,
+            version_number=(latest_version or 0) + 1,
+            front=sourced_content.front,
+            back=sourced_content.back,
+            cloze_text=sourced_content.cloze_text,
+            back_extra=sourced_content.back_extra,
+            source_excerpt=version.source_excerpt,
+            ai_enrichment=version.ai_enrichment,
+            created_by="system",
+        )
+        session.add(version)
+        session.flush()
+        card.current_version_id = version.id
+        card.content_fingerprint = sourced_fingerprint
+
     validate_content(
         card.card_type,
         CardContent(
