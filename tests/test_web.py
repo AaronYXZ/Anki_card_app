@@ -31,8 +31,8 @@ def test_dashboard_and_empty_workflows(client: TestClient) -> None:
 
     assert dashboard.status_code == 200
     assert "0 cards are ready" in dashboard.text
-    assert '/static/app.css?v=19' in dashboard.text
-    assert '/static/app.js?v=19' in dashboard.text
+    assert '/static/app.css?v=20' in dashboard.text
+    assert '/static/app.js?v=20' in dashboard.text
     assert "30-day first-attempt recall" in dashboard.text
     assert "N/A" in dashboard.text
     assert "No drafts waiting" in drafts.text
@@ -688,9 +688,9 @@ def test_normal_and_cloze_draft_sources_render_below_actions(
         details_position = article.index('<details class="source-evidence">')
         toggle_position = article.index('class="button source-toggle"')
         assert details_position < toggle_position < article.index(excerpt)
-        assert "Keep source" not in article[:details_position]
+        assert "> Keep</label>" not in article[:details_position]
         assert f'form="approve-card-{card.id}"' in article
-        assert " checked> Keep source" in article
+        assert " checked> Keep</label>" in article
 
     client.post(f"/cards/{normal.id}/approve", data={"keep_source": "false"})
     normal_preview = client.get(f"/cards/{normal.id}")

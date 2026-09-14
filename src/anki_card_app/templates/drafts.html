@@ -28,7 +28,7 @@
             <form action="/cards/{{ item.card.id }}/reject" method="post"><input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}"><button class="button danger" type="submit">Reject</button></form>
           </div>
           {% if item.version.source_excerpt and item.card.card_type.value in ["normal", "cloze"] %}
-            <details class="source-evidence"><summary>Compare with source</summary><label class="button source-toggle"><input type="checkbox" name="keep_source" value="true" form="approve-card-{{ item.card.id }}" checked> Keep source</label><div class="markdown-content source-markdown">{{ item.version.source_excerpt|markdown }}</div>{% if item.version.ai_enrichment %}<div class="markdown-content enrichment"><b>Extra context:</b>{{ item.version.ai_enrichment|markdown }}</div>{% endif %}</details>
+            <details class="source-evidence"><summary>Compare with source</summary><label class="button source-toggle"><input type="checkbox" name="keep_source" value="true" form="approve-card-{{ item.card.id }}" checked> Keep</label><div class="markdown-content source-markdown">{{ item.version.source_excerpt|markdown }}</div>{% if item.version.ai_enrichment %}<div class="markdown-content enrichment"><b>Extra context:</b>{{ item.version.ai_enrichment|markdown }}</div>{% endif %}</details>
           {% endif %}
         </article>
       {% endfor %}

@@ -42,7 +42,7 @@ kbd { display: inline-block; min-width: 1.5rem; padding: 0.1rem 0.35rem; border:
 .eyebrow { margin: 0; color: var(--accent) !important; font-size: 0.75rem !important; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 1.5rem; }
 .actions form { margin: 0; }
-.source-toggle { width: fit-content; gap: 0.45rem; margin: 0.85rem 0; font-weight: 700; }
+.source-toggle { width: fit-content; gap: 0.45rem; margin: 0 0 0 0.65rem; vertical-align: middle; font-weight: 700; }
 .button { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0.7rem 1rem; border: 1px solid var(--line); border-radius: 0.65rem; background: var(--surface); color: var(--ink); font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
 .button.primary { border-color: var(--accent); background: var(--accent); color: white; }
 .button.primary:hover { background: var(--accent-strong); }
@@ -115,7 +115,7 @@ textarea:focus, input[type="text"]:focus, input[type="email"]:focus, input[type=
 .highlight .nc, .highlight .nn { color: #235db5; font-weight: 700; }
 .highlight .o, .highlight .ow { color: #745315; }
 .markdown-content img { max-width: 100%; height: auto; }
-.markdown-content blockquote, .source-markdown { margin-left: 0; padding-left: 1rem; border-left: 3px solid var(--line); }
+.markdown-content blockquote { margin-left: 0; padding-left: 1rem; border-left: 3px solid var(--line); }
 .markdown-content li + li { margin-top: 0.35rem; }
 .enrichment { margin-top: 1rem; }
 .review-card { position: relative; max-width: 48rem; min-height: 20rem; }
@@ -134,8 +134,9 @@ textarea:focus, input[type="text"]:focus, input[type="email"]:focus, input[type=
 .rating-1 { border-color: #d9958f; }
 .rating-4 { border-color: #83ad91; }
 .source-evidence { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--muted); }
-.source-evidence summary { cursor: pointer; font-weight: 700; }
-.source-evidence blockquote { margin-left: 0; padding-left: 1rem; border-left: 3px solid var(--line); white-space: pre-wrap; }
+.source-evidence > summary { display: inline-flex; align-items: center; min-height: 2.75rem; vertical-align: middle; cursor: pointer; font-weight: 700; }
+.source-evidence .source-markdown { margin-left: 0; padding-left: 0; border-left: 0; }
+.source-evidence .source-markdown blockquote { margin-left: 0; padding-left: 0; border-left: 0; white-space: pre-wrap; }
 .import-row, .note-row, .chunk-list article { display: flex; justify-content: space-between; gap: 1rem; padding: 1.2rem; border: 1px solid var(--line); border-radius: 0.8rem; background: var(--surface); text-decoration: none; }
 .import-row span:first-child, .chunk-list article div { display: grid; gap: 0.35rem; }
 .note-list { display: grid; gap: 1rem; margin-top: 2rem; }

@@ -47,9 +47,9 @@ def test_pwa_resources_are_served_from_root_scope() -> None:
     assert service_worker.status_code == 200
     assert service_worker.headers["service-worker-allowed"] == "/"
     assert "no-cache" in service_worker.headers["cache-control"]
-    assert 'CACHE_NAME = "anki-shell-v19"' in service_worker.text
-    assert '"/static/app.css?v=19"' in service_worker.text
-    assert '"/static/app.js?v=19"' in service_worker.text
+    assert 'CACHE_NAME = "anki-shell-v20"' in service_worker.text
+    assert '"/static/app.css?v=20"' in service_worker.text
+    assert '"/static/app.js?v=20"' in service_worker.text
     assert 'request.method !== "GET"' in service_worker.text
     assert 'caches.match("/static/offline.html")' in service_worker.text
     assert styles.status_code == 200
@@ -67,6 +67,11 @@ def test_pwa_resources_are_served_from_root_scope() -> None:
     assert ".math.block" in styles.text
     assert ".favorite-button.active" in styles.text
     assert ".favorite-nav-link" in styles.text
+    assert ".source-evidence > summary { display: inline-flex" in styles.text
+    assert (
+        ".source-evidence .source-markdown { margin-left: 0; padding-left: 0; border-left: 0; }"
+        in styles.text
+    )
     assert ".nav-dropdown .nav-button" in styles.text
     assert "grid-template-columns: minmax(0, 1fr)" in styles.text
     assert "flex-direction: row" in styles.text
