@@ -42,8 +42,7 @@ kbd { display: inline-block; min-width: 1.5rem; padding: 0.1rem 0.35rem; border:
 .eyebrow { margin: 0; color: var(--accent) !important; font-size: 0.75rem !important; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 1.5rem; }
 .actions form { margin: 0; }
-.approve-form { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
-.source-toggle { gap: 0.45rem; font-weight: 700; }
+.source-toggle { width: fit-content; gap: 0.45rem; margin: 0.85rem 0; font-weight: 700; }
 .button { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0.7rem 1rem; border: 1px solid var(--line); border-radius: 0.65rem; background: var(--surface); color: var(--ink); font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
 .button.primary { border-color: var(--accent); background: var(--accent); color: white; }
 .button.primary:hover { background: var(--accent-strong); }
