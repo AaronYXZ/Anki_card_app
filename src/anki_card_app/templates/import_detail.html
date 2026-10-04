@@ -5,7 +5,7 @@
   <section class="page-heading">
     <p class="eyebrow">Generation run</p>
     <h1>{{ document.filename }}</h1>
-    <p>{{ document.relative_path }} · {{ run.provider }}/{{ run.model }}</p>
+    <p>{{ document.relative_path }} · {{ run.provider }}/{{ run.model }} · {{ run.generation_profile.value|title }}</p>
   </section>
   {% if run.error_summary %}<div class="notice error" role="alert">{{ run.error_summary }}</div>{% endif %}
   <div class="metrics run-metrics">

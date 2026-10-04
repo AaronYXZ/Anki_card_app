@@ -11,6 +11,10 @@
     <input type="hidden" name="csrf_token" value="{{ request.scope.get('csrf_token', '') }}">
     <label>Markdown or ZIP file <input type="file" name="upload" accept=".md,.zip" required></label>
     <p class="muted">Folders inside ZIP files are preserved as source paths. Unsafe archive paths are rejected.</p>
+    <fieldset>
+      <legend>Note type</legend>
+      <label class="confirmation"><input type="checkbox" name="behavioral" value="behavioral"{% if behavioral_selected %} checked{% endif %}> <span><b>Behavioral</b><small>Generate one Main Story card, four CARL cards, and cards for every variation and follow-up. Leave unchecked for standard notes.</small></span></label>
+    </fieldset>
     <fieldset class="model-picker">
       <legend>Card generation model</legend>
       {% for model_id, label in model_options %}

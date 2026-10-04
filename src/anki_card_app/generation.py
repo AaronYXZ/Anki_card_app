@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 import uuid
-from typing import Literal, Protocol
+from typing import Literal, Protocol, cast
 
 from openai import (
     AuthenticationError,
@@ -28,13 +28,16 @@ from anki_card_app.models import (
     CardType,
     ChunkGenerationStatus,
     GenerationChunkRun,
+    GenerationProfile,
     GenerationRun,
     GenerationStatus,
     SourceChunk,
+    SourceDocument,
     utc_now,
 )
 
 PROMPT_VERSION = "anki-v8-authored-answer-parser"
+BEHAVIORAL_PROMPT_VERSION = "behavioral-v2-evidence-recovery"
 AUTHORED_LABEL_RE = re.compile(
     r"^(?:#{1,6}[ \t]+)?"
     r"(?P<label>question|q|prompt|answer|a|response|solution)"
@@ -121,6 +124,53 @@ pitfalls in ai_enrichment, never in the tested prompt. Quote a short, exact sour
 that supports each card. Return no more than 20 cards for this chunk.
 """.strip()
 
+BEHAVIORAL_CARD_GENERATION_PROMPT = """
+Convert the complete behavioral story note below into Anki cards. The output is shown as
+draft previews before the user can approve cards for review.
+
+Preserve every factual claim, number, qualification, and the wording of the source note.
+Do not invent, improve, shorten, or reinterpret the story. Do not add speaking-time
+constraints. Derive one stable Story ID from the story title using lowercase kebab-case.
+Every card must use the tag `behavioral::story::<story-id>`, the same Story ID and Story
+Name, and a Card Role. Child cards must identify the Main Story through that shared Story ID.
+
+Create exactly one `behavioral_main` card with Card Role `Main Story`.
+Front:
+`<Story Name>\n\nRecall the complete story and the questions it can answer.`
+Back must contain, in order:
+1. `### Summary`. Select four or five complete sentences copied exactly from the source.
+   Cover the initial situation, central conflict, important action or decision,
+   constructive response, and outcome as fully as the source permits. Do not paraphrase.
+2. `### CARL`, followed by Context, Actions, Results, and Learnings. Copy the complete
+   original wording and preserve paragraph structure. Do not convert prose into bullets.
+3. `### Questions this story can answer`. Copy every question from the source's
+   `Best-fit behavioral questions` section in its original order and wording.
+
+Create exactly four `behavioral_carl` cards, one for each of Context, Actions, Results,
+and Learnings. Set Card Role to `CARL::Context`, `CARL::Actions`, `CARL::Results`, or
+`CARL::Learnings`. The front is `<Story Name>\n\n<CARL component>`. The back copies the
+entire matching source section exactly, preserving prose and paragraphs, then includes
+`Main Story: <Story Name>` and `Story ID: <story-id>`.
+
+Create a `behavioral_q` card with Card Role `Question::Variation` for every entry under
+`Question variations and answer pivots`. Copy the behavioral question exactly as the front.
+The back contains the Story Name, `Answer pivot:`, every corresponding pivot sentence or
+paragraph copied exactly, `Main Story: <Story Name>`, and the Story ID. Do not repeat CARL.
+
+Create a `behavioral_q` card with Card Role `Question::Follow-up` for every entry under
+`Follow-up questions and natural answers`. Copy the question exactly as the front. Copy the
+complete natural answer exactly as the back, preserving prose and paragraphs, then include
+the Main Story name and Story ID.
+
+Before returning, verify there is one Main Story and exactly four CARL cards, every listed
+variation and follow-up has a card, all extracted answers use exact source wording, the
+summary has four or five exact source sentences, every child shares the same Story ID,
+all numbers match, and nothing was silently omitted. For every `source_excerpt`, copy one
+short verbatim span of 8 to 40 words from the source. Do not add labels, quotation marks,
+ellipses, or normalized punctuation to that span. Return cards in this order: Main Story,
+four CARL cards, variations, then follow-ups.
+""".strip()
+
 
 class GenerationProviderError(RuntimeError):
     def __init__(self, message: str, *, retryable: bool, abort_run: bool) -> None:
@@ -132,13 +182,23 @@ class GenerationProviderError(RuntimeError):
 class GeneratedCard(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    card_type: Literal["normal", "cloze", "skeleton_recall"]
+    card_type: Literal[
+        "normal",
+        "cloze",
+        "skeleton_recall",
+        "behavioral_main",
+        "behavioral_carl",
+        "behavioral_q",
+    ]
     front: str | None = None
     back: str | None = None
     cloze_text: str | None = None
     back_extra: str | None = None
     source_excerpt: str = Field(min_length=1, max_length=1_500)
     ai_enrichment: str | None = Field(default=None, max_length=2_000)
+    story_id: str | None = Field(default=None, max_length=128)
+    story_name: str | None = Field(default=None, max_length=500)
+    card_role: str | None = Field(default=None, max_length=64)
 
     @model_validator(mode="after")
     def validate_card_content(self) -> GeneratedCard:
@@ -157,6 +217,54 @@ class GeneratedCard(BaseModel):
 class GeneratedCardBatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
     cards: list[GeneratedCard] = Field(max_length=20)
+
+    @model_validator(mode="after")
+    def reject_specialized_card_types(self) -> GeneratedCardBatch:
+        if any(card.card_type.startswith("behavioral_") for card in self.cards):
+            raise ValueError("Behavioral card types require Behavioral import mode.")
+        return self
+
+
+class BehavioralGeneratedCardBatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cards: list[GeneratedCard] = Field(min_length=5, max_length=60)
+
+    @model_validator(mode="after")
+    def validate_story_structure(self) -> BehavioralGeneratedCardBatch:
+        expected_carl_roles = {
+            "CARL::Context",
+            "CARL::Actions",
+            "CARL::Results",
+            "CARL::Learnings",
+        }
+        main_cards = [card for card in self.cards if card.card_type == "behavioral_main"]
+        carl_cards = [card for card in self.cards if card.card_type == "behavioral_carl"]
+        question_cards = [card for card in self.cards if card.card_type == "behavioral_q"]
+        if len(main_cards) + len(carl_cards) + len(question_cards) != len(self.cards):
+            raise ValueError("Behavioral output contains an unsupported card type.")
+        if len(main_cards) != 1 or main_cards[0].card_role != "Main Story":
+            raise ValueError("Behavioral output requires exactly one Main Story card.")
+        if len(carl_cards) != 4 or {card.card_role for card in carl_cards} != expected_carl_roles:
+            raise ValueError("Behavioral output requires all four CARL component cards.")
+        if any(
+            card.card_role not in {"Question::Variation", "Question::Follow-up"}
+            for card in question_cards
+        ):
+            raise ValueError("Behavioral question cards require a supported Card Role.")
+        story_ids = {card.story_id for card in self.cards}
+        story_names = {card.story_name for card in self.cards}
+        if None in story_ids or len(story_ids) != 1:
+            raise ValueError("Every behavioral card must share one Story ID.")
+        if None in story_names or len(story_names) != 1:
+            raise ValueError("Every behavioral card must share one Story Name.")
+        story_id = next(iter(story_ids))
+        if (
+            not isinstance(story_id, str)
+            or re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", story_id) is None
+        ):
+            raise ValueError("Story ID must use lowercase kebab-case.")
+        return self
 
 
 class GenerationResult(BaseModel):
@@ -219,6 +327,53 @@ def extract_authored_qa_cards(text: str) -> list[GeneratedCard]:
     return cards
 
 
+def _evidence_fragments(text: str | None) -> list[str]:
+    if not text:
+        return []
+    fragments: list[str] = []
+    for line in text.splitlines():
+        cleaned = re.sub(r"^(?:#{1,6}|[-*+] |\d+[.)] )\s*", "", line.strip())
+        if cleaned:
+            fragments.append(cleaned)
+            fragments.extend(
+                sentence.strip()
+                for sentence in re.split(r"(?<=[.!?])\s+", cleaned)
+                if sentence.strip()
+            )
+    return fragments
+
+
+def _exact_source_span(fragment: str, source_text: str) -> str | None:
+    candidate = fragment.strip()
+    if len(candidate) < 8:
+        return None
+    if candidate in source_text:
+        return candidate
+    words = candidate.split()
+    if len(words) < 2:
+        return None
+    match = re.search(r"\s+".join(re.escape(word) for word in words), source_text)
+    return match.group(0) if match is not None else None
+
+
+def resolve_source_evidence(candidate: GeneratedCard, source_text: str) -> str | None:
+    supplied = _exact_source_span(candidate.source_excerpt, source_text)
+    if supplied is not None:
+        return supplied
+    seen: set[str] = set()
+    for fragment in [
+        *_evidence_fragments(candidate.back),
+        *_evidence_fragments(candidate.front),
+    ]:
+        if fragment in seen:
+            continue
+        seen.add(fragment)
+        evidence = _exact_source_span(fragment, source_text)
+        if evidence is not None:
+            return evidence
+    return None
+
+
 class CardGenerator(Protocol):
     provider: str
     model: str
@@ -234,10 +389,14 @@ class OpenAICardGenerator:
         *,
         api_key: str,
         model: str,
+        profile: GenerationProfile = GenerationProfile.GENERAL,
+        source_text: str | None = None,
         timeout_seconds: float = 90.0,
         max_retries: int = 0,
     ) -> None:
         self.model = model
+        self.profile = profile
+        self.source_text = source_text
         self._client = OpenAI(
             api_key=api_key,
             timeout=timeout_seconds,
@@ -245,15 +404,33 @@ class OpenAICardGenerator:
         )
 
     def generate(self, chunk: SourceChunk) -> GenerationResult:
-        authored_cards = extract_authored_qa_cards(chunk.text)
-        if authored_cards:
-            return GenerationResult(cards=authored_cards)
+        profile = getattr(self, "profile", GenerationProfile.GENERAL)
+        source_text = (
+            getattr(self, "source_text", None)
+            if profile is GenerationProfile.BEHAVIORAL
+            else chunk.text
+        )
+        source_text = source_text or chunk.text
+        if profile is GenerationProfile.GENERAL:
+            authored_cards = extract_authored_qa_cards(source_text)
+            if authored_cards:
+                return GenerationResult(cards=authored_cards)
+        prompt = (
+            BEHAVIORAL_CARD_GENERATION_PROMPT
+            if profile is GenerationProfile.BEHAVIORAL
+            else CARD_GENERATION_PROMPT
+        )
+        response_format: type[GeneratedCardBatch] | type[BehavioralGeneratedCardBatch] = (
+            BehavioralGeneratedCardBatch
+            if profile is GenerationProfile.BEHAVIORAL
+            else GeneratedCardBatch
+        )
         heading = chunk.heading_path or "Untitled section"
         try:
             response = self._client.responses.parse(
                 model=self.model,
-                input=f"{CARD_GENERATION_PROMPT}\n\nHeading: {heading}\n\nSOURCE:\n{chunk.text}",
-                text_format=GeneratedCardBatch,
+                input=f"{prompt}\n\nHeading: {heading}\n\nSOURCE:\n{source_text}",
+                text_format=response_format,
                 reasoning={"effort": "low"},
             )
         except RateLimitError as exc:
@@ -299,7 +476,12 @@ class OpenAICardGenerator:
         parsed = response.output_parsed
         if parsed is None:
             raise RuntimeError("The model returned no structured card batch.")
-        return GenerationResult(cards=parsed.cards, request_id=response._request_id)
+        parsed_cards = getattr(parsed, "cards", None)
+        if not isinstance(parsed_cards, list):
+            raise RuntimeError("The model returned an unsupported card batch.")
+        return GenerationResult(
+            cards=cast(list[GeneratedCard], parsed_cards), request_id=response._request_id
+        )
 
 
 def create_generation_run(
@@ -310,25 +492,33 @@ def create_generation_run(
     provider: str,
     model: str,
     input_hash: str,
+    profile: GenerationProfile = GenerationProfile.GENERAL,
 ) -> GenerationRun:
     chunks = session.scalars(
         select(SourceChunk)
         .where(SourceChunk.source_document_id == source_document_id)
         .order_by(SourceChunk.sequence)
     ).all()
+    selected_chunks = chunks[:1] if profile is GenerationProfile.BEHAVIORAL else chunks
     run = GenerationRun(
         user_id=user_id,
         source_document_id=source_document_id,
-        prompt_version=PROMPT_VERSION,
+        prompt_version=(
+            BEHAVIORAL_PROMPT_VERSION
+            if profile is GenerationProfile.BEHAVIORAL
+            else PROMPT_VERSION
+        ),
+        generation_profile=profile,
         provider=provider,
         model=model,
         input_hash=input_hash,
-        total_chunks=len(chunks),
+        total_chunks=len(selected_chunks),
     )
     session.add(run)
     session.flush()
     session.add_all(
-        GenerationChunkRun(generation_run_id=run.id, source_chunk_id=chunk.id) for chunk in chunks
+        GenerationChunkRun(generation_run_id=run.id, source_chunk_id=chunk.id)
+        for chunk in selected_chunks
     )
     session.flush()
     return run
@@ -342,8 +532,40 @@ def _save_candidates(
     candidates: list[GeneratedCard],
 ) -> int:
     created = 0
-    for candidate in candidates:
-        if candidate.source_excerpt not in chunk.text:
+    source_text = chunk.text
+    if run.generation_profile is GenerationProfile.BEHAVIORAL:
+        document = session.get(SourceDocument, run.source_document_id)
+        if document is None:
+            return 0
+        source_text = document.raw_content
+    ordered_candidates = sorted(
+        candidates,
+        key=lambda candidate: candidate.card_type != CardType.BEHAVIORAL_MAIN.value,
+    )
+    main_story_card = session.scalar(
+        select(Card).where(
+            Card.user_id == run.user_id,
+            Card.story_id == next(
+                (candidate.story_id for candidate in candidates if candidate.story_id), None
+            ),
+            Card.card_type == CardType.BEHAVIORAL_MAIN,
+        )
+    )
+    for candidate in ordered_candidates:
+        source_excerpt = (
+            candidate.source_excerpt
+            if candidate.source_excerpt in source_text
+            else (
+                resolve_source_evidence(candidate, source_text)
+                if run.generation_profile is GenerationProfile.BEHAVIORAL
+                else None
+            )
+        )
+        if source_excerpt is None:
+            if run.generation_profile is GenerationProfile.BEHAVIORAL:
+                raise CardValidationError(
+                    "Behavioral generation returned a card without exact source evidence."
+                )
             continue
         card_type = CardType(candidate.card_type)
         content = candidate.as_card_content()
@@ -356,7 +578,7 @@ def _save_candidates(
         ):
             continue
         try:
-            create_draft(
+            card = create_draft(
                 session,
                 user_id=run.user_id,
                 card_type=card_type,
@@ -365,11 +587,29 @@ def _save_candidates(
                 source_document_id=run.source_document_id,
                 source_chunk_id=chunk.id,
                 generation_run_id=run.id,
-                source_excerpt=candidate.source_excerpt,
+                source_excerpt=source_excerpt,
                 ai_enrichment=candidate.ai_enrichment,
+                tags=(
+                    [f"behavioral::story::{candidate.story_id}"]
+                    if candidate.story_id
+                    else []
+                ),
+                story_id=candidate.story_id,
+                story_name=candidate.story_name,
+                card_role=candidate.card_role,
+                main_story_card_id=(
+                    main_story_card.id
+                    if main_story_card is not None
+                    and candidate.card_type != CardType.BEHAVIORAL_MAIN.value
+                    else None
+                ),
             )
         except CardValidationError:
+            if run.generation_profile is GenerationProfile.BEHAVIORAL:
+                raise
             continue
+        if card.card_type is CardType.BEHAVIORAL_MAIN:
+            main_story_card = card
         created += 1
     return created
 

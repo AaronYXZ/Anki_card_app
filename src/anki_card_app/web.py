@@ -82,7 +82,7 @@ def current_user_id(request: Request, session: Session) -> uuid.UUID:
 
 
 def make_card_view(card: Card, version: CardVersion) -> CardView:
-    if card.card_type in {CardType.NORMAL, CardType.SKELETON_RECALL}:
+    if card.card_type is not CardType.CLOZE:
         return CardView(
             card=card,
             version=version,
@@ -354,7 +354,7 @@ def favorite_cards(request: Request, session: SessionDependency) -> HTMLResponse
 @router.post("/favorites/{card_id}/unlike", dependencies=[Depends(validate_csrf)])
 def unlike_favorite_card(
     request: Request, card_id: uuid.UUID, session: SessionDependency
-) -> RedirectResponse:
+) -> Response:
     user_id = current_user_id(request, session)
     try:
         set_card_favorite(
@@ -367,6 +367,8 @@ def unlike_favorite_card(
     except CardError as error:
         session.rollback()
         raise_http_card_error(error)
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     return RedirectResponse("/favorites", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -516,12 +518,20 @@ def edit_card_action(
 
 @router.post("/cards/{card_id}/approve", dependencies=[Depends(validate_csrf)])
 def approve_card_action(
-    request: Request, card_id: uuid.UUID, session: SessionDependency
+    request: Request,
+    card_id: uuid.UUID,
+    session: SessionDependency,
+    keep_source: Annotated[bool, Form()] = True,
 ) -> RedirectResponse:
     user_id = current_user_id(request, session)
     next_card_id = adjacent_draft_id(session, user_id=user_id, card_id=card_id)
     try:
-        approve_card(session, user_id=user_id, card_id=card_id)
+        approve_card(
+            session,
+            user_id=user_id,
+            card_id=card_id,
+            keep_source=keep_source,
+        )
         session.commit()
     except CardError as error:
         session.rollback()

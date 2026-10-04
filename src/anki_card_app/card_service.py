@@ -20,6 +20,7 @@ from anki_card_app.models import (
 )
 
 CLOZE_PATTERN = re.compile(r"{{c[1-9]\d*::.+?}}", re.DOTALL)
+SOURCE_HEADING = "### Source"
 
 
 class CardError(ValueError):
@@ -79,6 +80,15 @@ def validate_content(card_type: CardType, content: CardContent) -> CardContent:
             raise CardValidationError("Normal cards require both a question and an answer.")
         return normalized
 
+    if card_type in {
+        CardType.BEHAVIORAL_MAIN,
+        CardType.BEHAVIORAL_CARL,
+        CardType.BEHAVIORAL_QUESTION,
+    }:
+        if normalized.front is None or normalized.back is None:
+            raise CardValidationError("This card type requires both a front and a back.")
+        return normalized
+
     if card_type is CardType.SKELETON_RECALL:
         if normalized.front is None or normalized.back is None:
             raise CardValidationError(
@@ -91,6 +101,37 @@ def validate_content(card_type: CardType, content: CardContent) -> CardContent:
     if CLOZE_PATTERN.search(normalized.cloze_text) is None:
         raise CardValidationError("Cloze text must include a deletion such as {{c1::answer}}.")
     return normalized
+
+
+def _content_with_source(
+    card_type: CardType,
+    content: CardContent,
+    source_excerpt: str | None,
+) -> CardContent:
+    source = clean_optional(source_excerpt)
+    if source is None or card_type not in {CardType.NORMAL, CardType.CLOZE}:
+        return content
+    source_section = f"{SOURCE_HEADING}\n\n{source}"
+    if card_type is CardType.NORMAL:
+        back = content.back or ""
+        if source_section in back:
+            return content
+        return CardContent(
+            front=content.front,
+            back=f"{back.rstrip()}\n\n---\n\n{source_section}",
+            cloze_text=content.cloze_text,
+            back_extra=content.back_extra,
+        )
+    back_extra = content.back_extra or ""
+    if source_section in back_extra:
+        return content
+    separator = "\n\n---\n\n" if back_extra else ""
+    return CardContent(
+        front=content.front,
+        back=content.back,
+        cloze_text=content.cloze_text,
+        back_extra=f"{back_extra.rstrip()}{separator}{source_section}",
+    )
 
 
 def get_owned_card(session: Session, *, user_id: uuid.UUID, card_id: uuid.UUID) -> Card:
@@ -158,6 +199,11 @@ def create_draft(
     ai_enrichment: str | None = None,
     note_id: uuid.UUID | None = None,
     template_key: str | None = None,
+    tags: list[str] | None = None,
+    story_id: str | None = None,
+    story_name: str | None = None,
+    card_role: str | None = None,
+    main_story_card_id: uuid.UUID | None = None,
 ) -> Card:
     if (note_id is None) != (template_key is None):
         raise CardValidationError("A sibling card requires both a note and a template key.")
@@ -179,6 +225,11 @@ def create_draft(
         generation_run_id=generation_run_id,
         note_id=note_id,
         template_key=template_key,
+        tags=tags or [],
+        story_id=clean_optional(story_id),
+        story_name=clean_optional(story_name),
+        card_role=clean_optional(card_role),
+        main_story_card_id=main_story_card_id,
         content_fingerprint=fingerprint,
     )
     session.add(card)
@@ -254,12 +305,53 @@ def approve_card(
     user_id: uuid.UUID,
     card_id: uuid.UUID,
     due_at: datetime | None = None,
+    keep_source: bool = True,
 ) -> Card:
     card = get_owned_card(session, user_id=user_id, card_id=card_id)
     if card.state is not CardState.DRAFT:
         raise InvalidCardTransitionError("Only draft cards can be approved.")
 
     version = get_current_version(session, card)
+    current_content = CardContent(
+        front=version.front,
+        back=version.back,
+        cloze_text=version.cloze_text,
+        back_extra=version.back_extra,
+    )
+    sourced_content = (
+        _content_with_source(card.card_type, current_content, version.source_excerpt)
+        if keep_source
+        else current_content
+    )
+    if sourced_content != current_content:
+        sourced_fingerprint = content_fingerprint(card.card_type, sourced_content)
+        if session.scalar(
+            select(Card.id).where(
+                Card.user_id == user_id,
+                Card.id != card.id,
+                Card.content_fingerprint == sourced_fingerprint,
+            )
+        ):
+            raise CardValidationError("An exact duplicate card already exists.")
+        latest_version = session.scalar(
+            select(func.max(CardVersion.version_number)).where(CardVersion.card_id == card.id)
+        )
+        version = CardVersion(
+            card_id=card.id,
+            version_number=(latest_version or 0) + 1,
+            front=sourced_content.front,
+            back=sourced_content.back,
+            cloze_text=sourced_content.cloze_text,
+            back_extra=sourced_content.back_extra,
+            source_excerpt=version.source_excerpt,
+            ai_enrichment=version.ai_enrichment,
+            created_by="system",
+        )
+        session.add(version)
+        session.flush()
+        card.current_version_id = version.id
+        card.content_fingerprint = sourced_fingerprint
+
     validate_content(
         card.card_type,
         CardContent(
@@ -270,14 +362,16 @@ def approve_card(
         ),
     )
     card.state = CardState.ACTIVE
-    card.updated_at = utc_now()
+    approved_at = utc_now()
+    card.approved_at = approved_at
+    card.updated_at = approved_at
     user = session.get(UserAccount, user_id)
     if user is None:
         raise CardValidationError("Card owner is missing.")
     session.add(
         create_initial_schedule(
             card_id=card.id,
-            due_at=due_at or utc_now(),
+            due_at=due_at or approved_at,
             desired_retention=user.desired_retention,
         )
     )

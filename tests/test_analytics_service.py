@@ -10,6 +10,7 @@ from anki_card_app.models import (
     CardType,
     ReviewLog,
     ReviewSession,
+    ReviewSessionCard,
     SchedulingState,
     UserAccount,
 )
@@ -152,6 +153,8 @@ def test_dashboard_metrics_and_first_attempt_recall(db_session: Session) -> None
     assert metrics.overdue_count == 1
     assert metrics.new_ready_count == 1
     assert metrics.reviewed_today == 3
+    assert metrics.quota_reviewed_today == 3
+    assert metrics.bonus_reviewed_today == 0
     assert metrics.completed_sessions_today == 1
     assert metrics.review_minutes_today == 2
     assert metrics.card_counts["draft"] == 1
@@ -171,3 +174,41 @@ def test_dashboard_metrics_handles_unknown_timezone_and_no_reviews(
     assert metrics.ready_count == 0
     assert metrics.recall_attempts_30d == 0
     assert metrics.recall_rate_30d is None
+
+
+def test_dashboard_separates_bonus_reviews_from_daily_quota(db_session: Session) -> None:
+    user = make_user(db_session, timezone="UTC")
+    card = make_card(db_session, user, label="Fresh", due_at=NOW)
+    review_session = ReviewSession(
+        user_id=user.id,
+        queue_size=1,
+        reviewed_count=1,
+        started_at=NOW,
+        completed_at=NOW,
+    )
+    db_session.add(review_session)
+    db_session.flush()
+    db_session.add(
+        ReviewSessionCard(
+            review_session_id=review_session.id,
+            card_id=card.id,
+            position=0,
+            is_bonus=True,
+            completed_at=NOW,
+        )
+    )
+    add_log(
+        db_session,
+        user=user,
+        card=card,
+        reviewed_at=NOW,
+        rating=3,
+        was_new=True,
+        review_session_id=review_session.id,
+    )
+
+    metrics = dashboard_metrics(db_session, user_id=user.id, now=NOW)
+
+    assert metrics.reviewed_today == 1
+    assert metrics.quota_reviewed_today == 0
+    assert metrics.bonus_reviewed_today == 1
